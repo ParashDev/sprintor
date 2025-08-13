@@ -35,19 +35,37 @@ export default function JoinSessionPage() {
         return
       }
 
+      // Clear any existing session data first
+      localStorage.removeItem('sprintor_current_session')
+      
       // Generate participant ID and store user info
       const participantId = Math.random().toString(36).substring(2, 9)
       localStorage.setItem('sprintor_user_id', participantId)
       localStorage.setItem('sprintor_user_name', formData.userName)
+      
+      // Store current session info for reconnection
+      localStorage.setItem('sprintor_current_session', JSON.stringify({
+        sessionId: formData.sessionId.toUpperCase(),
+        sessionName: session.name,
+        userRole: 'participant',
+        joinedAt: new Date().toISOString()
+      }))
 
-      // Check if participant name is already taken
-      const existingParticipant = session.participants.find(
+      // Check if participant name is already taken by an ONLINE user
+      const existingOnlineParticipant = session.participants.find(
         p => p.name.toLowerCase() === formData.userName.toLowerCase() && p.isOnline
       )
 
-      if (existingParticipant) {
-        alert('A participant with this name is already in the session. Please choose a different name.')
-        return
+      if (existingOnlineParticipant) {
+        // Check if this might be a reconnection (user has localStorage data)
+        const storedName = localStorage.getItem('sprintor_user_name')
+        if (storedName && storedName.toLowerCase() === formData.userName.toLowerCase()) {
+          // This is likely a reconnection - allow it
+          console.log('Reconnecting existing participant')
+        } else {
+          alert('A participant with this name is already online in the session. Please choose a different name.')
+          return
+        }
       }
 
       // Join the session
@@ -59,7 +77,7 @@ export default function JoinSessionPage() {
       })
 
       // Redirect to session
-      router.push(`/session/${formData.sessionId.toUpperCase()}`)
+      router.push(`/session/${formData.sessionId.toUpperCase()}?fresh=true`)
     } catch (error: unknown) {
       console.error('Error joining session:', error)
       if (error instanceof Error && error.message === 'Session not found') {

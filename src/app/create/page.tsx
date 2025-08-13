@@ -34,6 +34,9 @@ export default function CreateSessionPage() {
     setIsLoading(true)
 
     try {
+      // Clear any existing session data first
+      localStorage.removeItem('sprintor_current_session')
+      
       const hostId = Math.random().toString(36).substring(2, 9)
       localStorage.setItem('sprintor_user_id', hostId)
       localStorage.setItem('sprintor_user_name', formData.hostName)
@@ -79,7 +82,16 @@ export default function CreateSessionPage() {
       }
 
       const sessionId = await createSession(sessionData)
-      router.push(`/session/${sessionId}`)
+      
+      // Store current session info for reconnection
+      localStorage.setItem('sprintor_current_session', JSON.stringify({
+        sessionId: sessionId,
+        sessionName: formData.sessionName,
+        userRole: 'host',
+        joinedAt: new Date().toISOString()
+      }))
+      
+      router.push(`/session/${sessionId}?fresh=true`)
     } catch (error) {
       console.error('Error creating session:', error)
       alert('Failed to create session. Please try again.')

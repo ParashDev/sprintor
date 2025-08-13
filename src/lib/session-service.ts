@@ -48,6 +48,23 @@ export function generateRoomCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase()
 }
 
+// Helper function to clean participant data for Firestore
+function cleanParticipantsForFirestore(participants: any[]): Record<string, unknown>[] {
+  return participants.map(p => {
+    const cleanParticipant: Record<string, unknown> = {}
+    Object.entries(p).forEach(([key, value]) => {
+      if (value !== undefined) {
+        if (key === 'lastSeen') {
+          cleanParticipant[key] = Timestamp.fromDate(value as Date)
+        } else {
+          cleanParticipant[key] = value
+        }
+      }
+    })
+    return cleanParticipant
+  })
+}
+
 // Create a new session
 export async function createSession(sessionData: Omit<Session, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
   const roomCode = generateRoomCode()
@@ -113,30 +130,39 @@ export function subscribeToSession(sessionId: string, callback: (session: Sessio
       return
     }
 
-    const data = doc.data()
-    const session: Session = {
-      ...data,
-      createdAt: data.createdAt?.toDate() || new Date(),
-      updatedAt: data.updatedAt?.toDate() || new Date(),
-      participants: data.participants?.map((p: FirestoreParticipant) => ({
-        ...p,
-        lastSeen: 'toDate' in p.lastSeen ? p.lastSeen.toDate() : p.lastSeen
-      })) || [],
-      stories: data.stories?.map((s: FirestoreStory) => ({
-        ...s,
-        createdAt: 'toDate' in s.createdAt ? s.createdAt.toDate() : s.createdAt,
-        votingHistory: s.votingHistory?.map((round: FirestoreVotingRound) => ({
-          ...round,
-          timestamp: 'toDate' in round.timestamp ? round.timestamp.toDate() : round.timestamp
+    try {
+      const data = doc.data()
+      
+      const session: Session = {
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+        participants: data.participants?.map((p: FirestoreParticipant) => ({
+          ...p,
+          lastSeen: 'toDate' in p.lastSeen ? p.lastSeen.toDate() : p.lastSeen
+        })) || [],
+        stories: data.stories?.map((s: FirestoreStory) => ({
+          ...s,
+          createdAt: 'toDate' in s.createdAt ? s.createdAt.toDate() : s.createdAt,
+          votingHistory: s.votingHistory?.map((round: FirestoreVotingRound) => ({
+            ...round,
+            timestamp: 'toDate' in round.timestamp ? round.timestamp.toDate() : round.timestamp
+          })) || []
         })) || []
-      })) || []
-    } as Session
+      } as Session
 
-    callback(session)
+      callback(session)
+    } catch (error) {
+      console.error('Error processing session data:', error)
+      callback(null)
+    }
+  }, (error) => {
+    console.error('Firestore subscription error:', error)
+    callback(null)
   })
 }
 
-// Add participant to session
+// Add participant to session (or reconnect existing)
 export async function joinSession(sessionId: string, participant: Omit<Participant, 'lastSeen'>): Promise<void> {
   const session = await getSession(sessionId)
   if (!session) throw new Error('Session not found')
@@ -147,15 +173,41 @@ export async function joinSession(sessionId: string, participant: Omit<Participa
     lastSeen: new Date()
   }
 
-  // Add participant to existing participants array
-  const updatedParticipants = [...session.participants, participantWithTimestamp]
+  // Check if participant with same name or ID already exists (for reconnection)
+  const existingParticipantByName = session.participants.findIndex(
+    p => p.name.toLowerCase() === participant.name.toLowerCase()
+  )
+  const existingParticipantById = session.participants.findIndex(
+    p => p.id === participant.id
+  )
+
+  let updatedParticipants
+  
+  // Prioritize ID match, then name match for reconnection
+  const existingIndex = existingParticipantById >= 0 ? existingParticipantById : existingParticipantByName
+  
+  if (existingIndex >= 0) {
+    // Update existing participant (reconnection case)
+    updatedParticipants = [...session.participants]
+    updatedParticipants[existingIndex] = {
+      ...updatedParticipants[existingIndex],
+      id: participant.id, // Ensure ID is updated
+      name: participant.name, // Ensure name is updated
+      isHost: participant.isHost, // Preserve host status
+      isOnline: true,
+      lastSeen: new Date(),
+      vote: updatedParticipants[existingIndex].vote // Preserve any existing vote
+    }
+    console.log(`Reconnected participant: ${participant.name}`)
+  } else {
+    // Add new participant
+    updatedParticipants = [...session.participants, participantWithTimestamp]
+    console.log(`Added new participant: ${participant.name}`)
+  }
 
   const sessionRef = doc(db, 'sessions', sessionId)
   await updateDoc(sessionRef, {
-    participants: updatedParticipants.map(p => ({
-      ...p,
-      lastSeen: Timestamp.fromDate(p.lastSeen)
-    })),
+    participants: cleanParticipantsForFirestore(updatedParticipants),
     updatedAt: serverTimestamp()
   })
 }
@@ -171,10 +223,7 @@ export async function updateParticipant(sessionId: string, participantId: string
 
   const sessionRef = doc(db, 'sessions', sessionId)
   await updateDoc(sessionRef, {
-    participants: updatedParticipants.map(p => ({
-      ...p,
-      lastSeen: Timestamp.fromDate(p.lastSeen)
-    })),
+    participants: cleanParticipantsForFirestore(updatedParticipants),
     updatedAt: serverTimestamp()
   })
 }
@@ -188,10 +237,23 @@ export async function leaveSession(sessionId: string, participantId: string): Pr
   
   const sessionRef = doc(db, 'sessions', sessionId)
   await updateDoc(sessionRef, {
-    participants: updatedParticipants.map(p => ({
-      ...p,
-      lastSeen: Timestamp.fromDate(p.lastSeen)
-    })),
+    participants: cleanParticipantsForFirestore(updatedParticipants),
+    updatedAt: serverTimestamp()
+  })
+}
+
+// Mark participant as offline (alternative to removing)
+export async function markParticipantOffline(sessionId: string, participantId: string): Promise<void> {
+  const session = await getSession(sessionId)
+  if (!session) return
+
+  const updatedParticipants = session.participants.map(p => 
+    p.id === participantId ? { ...p, isOnline: false, lastSeen: new Date() } : p
+  )
+
+  const sessionRef = doc(db, 'sessions', sessionId)
+  await updateDoc(sessionRef, {
+    participants: cleanParticipantsForFirestore(updatedParticipants),
     updatedAt: serverTimestamp()
   })
 }
@@ -257,10 +319,7 @@ export async function castVote(sessionId: string, participantId: string, vote: s
 
   const sessionRef = doc(db, 'sessions', sessionId)
   await updateDoc(sessionRef, {
-    participants: updatedParticipants.map(p => ({
-      ...p,
-      lastSeen: Timestamp.fromDate(p.lastSeen)
-    })),
+    participants: cleanParticipantsForFirestore(updatedParticipants),
     updatedAt: serverTimestamp()
   })
 }
@@ -344,6 +403,74 @@ export async function endVoting(sessionId: string, finalEstimate?: string): Prom
   }
 
   await updateDoc(sessionRef, updateData)
+}
+
+// End session (mark as inactive)
+export async function endSession(sessionId: string): Promise<void> {
+  console.log('Ending session:', sessionId)
+  const sessionRef = doc(db, 'sessions', sessionId)
+  await updateDoc(sessionRef, {
+    isActive: false,
+    updatedAt: serverTimestamp()
+  })
+  console.log('Session ended successfully')
+}
+
+// Update participant heartbeat
+export async function updateParticipantHeartbeat(sessionId: string, participantId: string): Promise<void> {
+  const session = await getSession(sessionId)
+  if (!session) return
+
+  const updatedParticipants = session.participants.map(p => 
+    p.id === participantId ? { ...p, lastSeen: new Date(), isOnline: true } : p
+  )
+
+  const sessionRef = doc(db, 'sessions', sessionId)
+  await updateDoc(sessionRef, {
+    participants: cleanParticipantsForFirestore(updatedParticipants),
+    updatedAt: serverTimestamp()
+  })
+}
+
+// Check for inactive participants (haven't sent heartbeat in 2 minutes)
+export async function cleanupInactiveParticipants(sessionId: string): Promise<void> {
+  const session = await getSession(sessionId)
+  if (!session) return
+
+  const now = new Date()
+  const inactiveThreshold = 2 * 60 * 1000 // 2 minutes
+  const removeThreshold = 10 * 60 * 1000 // 10 minutes - remove completely after this
+
+  let updatedParticipants = session.participants.map(p => {
+    const timeSinceLastSeen = now.getTime() - p.lastSeen.getTime()
+    return timeSinceLastSeen > inactiveThreshold 
+      ? { ...p, isOnline: false }
+      : p
+  })
+
+  // Remove participants that have been offline for more than 10 minutes
+  // (but keep the host even if offline)
+  updatedParticipants = updatedParticipants.filter(p => {
+    const timeSinceLastSeen = now.getTime() - p.lastSeen.getTime()
+    return p.isHost || timeSinceLastSeen <= removeThreshold
+  })
+
+  // Only update if there were changes
+  const hasChanges = updatedParticipants.length !== session.participants.length || 
+    updatedParticipants.some((p, index) => 
+      !session.participants[index] || p.isOnline !== session.participants[index].isOnline
+    )
+
+  if (hasChanges) {
+    const sessionRef = doc(db, 'sessions', sessionId)
+    await updateDoc(sessionRef, {
+      participants: updatedParticipants.map(p => ({
+        ...p,
+        lastSeen: Timestamp.fromDate(p.lastSeen)
+      })),
+      updatedAt: serverTimestamp()
+    })
+  }
 }
 
 // Delete session
