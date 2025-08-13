@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Users, UserPlus } from "lucide-react"
-import { Card } from "@/components/ui/card"
 
 export function Hero() {
   return (

@@ -19,7 +19,7 @@ import {
   Target
 } from "lucide-react"
 import { subscribeToSession, addStory, startVoting, castVote, revealVotes, endVoting } from "@/lib/session-service"
-import type { Session, Story } from "@/types/session"
+import type { Session } from "@/types/session"
 
 const PREDEFINED_DECKS = {
   fibonacci: ['1', '2', '3', '5', '8', '13', '21', '?'],
@@ -34,7 +34,6 @@ export default function SessionPage() {
   
   const [session, setSession] = useState<Session | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string>('')
-  const [currentUserName, setCurrentUserName] = useState<string>('')
   const [isHost, setIsHost] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
@@ -54,7 +53,6 @@ export default function SessionPage() {
     }
     
     setCurrentUserId(userId)
-    setCurrentUserName(userName)
     
     // Subscribe to session updates
     const unsubscribe = subscribeToSession(sessionId, (sessionData) => {

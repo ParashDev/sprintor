@@ -169,7 +169,7 @@ export default function CreateSessionPage() {
                           className="min-h-24 text-base border-2 focus:border-primary resize-none"
                         />
                         <p className="text-sm text-muted-foreground">
-                          Add context about what you'll be estimating (optional)
+                          Add context about what you&apos;ll be estimating (optional)
                         </p>
                       </div>
 
@@ -261,7 +261,7 @@ export default function CreateSessionPage() {
                       </div>
                       <div className="text-sm">
                         <div className="font-medium">Get your room code</div>
-                        <div className="text-muted-foreground">You'll receive a 6-character code to share</div>
+                        <div className="text-muted-foreground">You&apos;ll receive a 6-character code to share</div>
                       </div>
                     </div>
                     <div className="flex gap-3">
