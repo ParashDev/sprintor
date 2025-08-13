@@ -39,7 +39,7 @@ export default function CreateSessionPage() {
       localStorage.setItem('sprintor_user_id', hostId)
       localStorage.setItem('sprintor_user_name', formData.hostName)
 
-      const sessionData: any = {
+      const sessionData: Record<string, any> = {
         name: formData.sessionName,
         description: formData.description,
         hostId,

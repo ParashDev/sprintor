@@ -25,7 +25,7 @@ export async function createSession(sessionData: Omit<Session, 'id' | 'createdAt
   const sessionRef = doc(db, 'sessions', roomCode)
   
   // Prepare session data, filtering out undefined values
-  const session: any = {
+  const session: Record<string, any> = {
     ...sessionData,
     id: roomCode,
     createdAt: serverTimestamp(),
@@ -58,14 +58,14 @@ export async function getSession(sessionId: string): Promise<Session | null> {
     ...data,
     createdAt: data.createdAt?.toDate() || new Date(),
     updatedAt: data.updatedAt?.toDate() || new Date(),
-    participants: data.participants?.map((p: any) => ({
+    participants: data.participants?.map((p: Record<string, any>) => ({
       ...p,
       lastSeen: p.lastSeen?.toDate() || new Date()
     })) || [],
-    stories: data.stories?.map((s: any) => ({
+    stories: data.stories?.map((s: Record<string, any>) => ({
       ...s,
       createdAt: s.createdAt?.toDate() || new Date(),
-      votingHistory: s.votingHistory?.map((round: any) => ({
+      votingHistory: s.votingHistory?.map((round: Record<string, any>) => ({
         ...round,
         timestamp: round.timestamp?.toDate() || new Date()
       })) || []
@@ -88,14 +88,14 @@ export function subscribeToSession(sessionId: string, callback: (session: Sessio
       ...data,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
-      participants: data.participants?.map((p: any) => ({
+      participants: data.participants?.map((p: Record<string, any>) => ({
         ...p,
         lastSeen: p.lastSeen?.toDate() || new Date()
       })) || [],
-      stories: data.stories?.map((s: any) => ({
+      stories: data.stories?.map((s: Record<string, any>) => ({
         ...s,
         createdAt: s.createdAt?.toDate() || new Date(),
-        votingHistory: s.votingHistory?.map((round: any) => ({
+        votingHistory: s.votingHistory?.map((round: Record<string, any>) => ({
           ...round,
           timestamp: round.timestamp?.toDate() || new Date()
         })) || []
@@ -250,7 +250,13 @@ export async function endVoting(sessionId: string, finalEstimate?: string): Prom
   if (!session || !session.currentStoryId) return
 
   // Create voting round record
-  const votingRound = {
+  const votingRound: {
+    id: string
+    votes: Record<string, string>
+    participantNames: Record<string, string>
+    timestamp: Date
+    finalEstimate?: string
+  } = {
     id: Math.random().toString(36).substring(2, 9),
     votes: {},
     participantNames: {},
@@ -288,7 +294,7 @@ export async function endVoting(sessionId: string, finalEstimate?: string): Prom
   const sessionRef = doc(db, 'sessions', sessionId)
   
   // Prepare update data
-  const updateData: any = {
+  const updateData: Record<string, any> = {
     stories: updatedStories.map(s => ({
       ...s,
       createdAt: Timestamp.fromDate(s.createdAt),
