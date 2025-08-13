@@ -14,6 +14,38 @@ import {
 import { db } from './firebase'
 import type { Session, Participant, Story, Vote } from '@/types/session'
 
+// Firestore document types
+interface FirestoreDoc {
+  [key: string]: unknown
+}
+
+interface FirestoreParticipant {
+  id: string
+  name: string
+  isHost: boolean
+  isOnline: boolean
+  lastSeen: { toDate(): Date } | Date
+  vote?: string | null
+}
+
+interface FirestoreStory {
+  id: string
+  title: string
+  description?: string
+  estimate?: string | null
+  isEstimated: boolean
+  createdAt: { toDate(): Date } | Date
+  votingHistory?: FirestoreVotingRound[]
+}
+
+interface FirestoreVotingRound {
+  id: string
+  votes: Record<string, string>
+  participantNames: Record<string, string>
+  timestamp: { toDate(): Date } | Date
+  finalEstimate?: string
+}
+
 // Generate room codes
 export function generateRoomCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase()
@@ -25,7 +57,7 @@ export async function createSession(sessionData: Omit<Session, 'id' | 'createdAt
   const sessionRef = doc(db, 'sessions', roomCode)
   
   // Prepare session data, filtering out undefined values
-  const session: Record<string, any> = {
+  const session: FirestoreDoc = {
     ...sessionData,
     id: roomCode,
     createdAt: serverTimestamp(),
@@ -58,16 +90,16 @@ export async function getSession(sessionId: string): Promise<Session | null> {
     ...data,
     createdAt: data.createdAt?.toDate() || new Date(),
     updatedAt: data.updatedAt?.toDate() || new Date(),
-    participants: data.participants?.map((p: Record<string, any>) => ({
+    participants: data.participants?.map((p: FirestoreParticipant) => ({
       ...p,
-      lastSeen: p.lastSeen?.toDate() || new Date()
+      lastSeen: 'toDate' in p.lastSeen ? p.lastSeen.toDate() : p.lastSeen
     })) || [],
-    stories: data.stories?.map((s: Record<string, any>) => ({
+    stories: data.stories?.map((s: FirestoreStory) => ({
       ...s,
-      createdAt: s.createdAt?.toDate() || new Date(),
-      votingHistory: s.votingHistory?.map((round: Record<string, any>) => ({
+      createdAt: 'toDate' in s.createdAt ? s.createdAt.toDate() : s.createdAt,
+      votingHistory: s.votingHistory?.map((round: FirestoreVotingRound) => ({
         ...round,
-        timestamp: round.timestamp?.toDate() || new Date()
+        timestamp: 'toDate' in round.timestamp ? round.timestamp.toDate() : round.timestamp
       })) || []
     })) || []
   } as Session
@@ -88,16 +120,16 @@ export function subscribeToSession(sessionId: string, callback: (session: Sessio
       ...data,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
-      participants: data.participants?.map((p: Record<string, any>) => ({
+      participants: data.participants?.map((p: FirestoreParticipant) => ({
         ...p,
-        lastSeen: p.lastSeen?.toDate() || new Date()
+        lastSeen: 'toDate' in p.lastSeen ? p.lastSeen.toDate() : p.lastSeen
       })) || [],
-      stories: data.stories?.map((s: Record<string, any>) => ({
+      stories: data.stories?.map((s: FirestoreStory) => ({
         ...s,
-        createdAt: s.createdAt?.toDate() || new Date(),
-        votingHistory: s.votingHistory?.map((round: Record<string, any>) => ({
+        createdAt: 'toDate' in s.createdAt ? s.createdAt.toDate() : s.createdAt,
+        votingHistory: s.votingHistory?.map((round: FirestoreVotingRound) => ({
           ...round,
-          timestamp: round.timestamp?.toDate() || new Date()
+          timestamp: 'toDate' in round.timestamp ? round.timestamp.toDate() : round.timestamp
         })) || []
       })) || []
     } as Session
@@ -294,7 +326,7 @@ export async function endVoting(sessionId: string, finalEstimate?: string): Prom
   const sessionRef = doc(db, 'sessions', sessionId)
   
   // Prepare update data
-  const updateData: Record<string, any> = {
+  const updateData: FirestoreDoc = {
     stories: updatedStories.map(s => ({
       ...s,
       createdAt: Timestamp.fromDate(s.createdAt),

@@ -39,7 +39,24 @@ export default function CreateSessionPage() {
       localStorage.setItem('sprintor_user_id', hostId)
       localStorage.setItem('sprintor_user_name', formData.hostName)
 
-      const sessionData: Record<string, any> = {
+      const sessionData: {
+        name: string
+        description: string
+        hostId: string
+        deckType: string
+        customDeck?: string[]
+        participants: Array<{
+          id: string
+          name: string
+          isHost: boolean
+          isOnline: boolean
+          lastSeen: Date
+        }>
+        stories: never[]
+        votingInProgress: boolean
+        votesRevealed: boolean
+        isActive: boolean
+      } = {
         name: formData.sessionName,
         description: formData.description,
         hostId,
