@@ -42,7 +42,12 @@ export default function SessionPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
   const [showReconnectModal, setShowReconnectModal] = useState(false)
-  const [storedSessionInfo, setStoredSessionInfo] = useState<any>(null)
+  const [storedSessionInfo, setStoredSessionInfo] = useState<{
+    sessionId: string
+    sessionName: string
+    userRole: 'host' | 'participant'
+    joinedAt: string
+  } | null>(null)
   const [showSessionEndedDialog, setShowSessionEndedDialog] = useState(false)
   
   // Story management

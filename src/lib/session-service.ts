@@ -49,7 +49,7 @@ export function generateRoomCode(): string {
 }
 
 // Helper function to clean participant data for Firestore
-function cleanParticipantsForFirestore(participants: any[]): Record<string, unknown>[] {
+function cleanParticipantsForFirestore(participants: Participant[]): Record<string, unknown>[] {
   return participants.map(p => {
     const cleanParticipant: Record<string, unknown> = {}
     Object.entries(p).forEach(([key, value]) => {
