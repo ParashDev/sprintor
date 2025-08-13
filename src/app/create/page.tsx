@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, Users, Settings } from "lucide-react"
 import { createSession } from "@/lib/session-service"
@@ -26,7 +25,7 @@ export default function CreateSessionPage() {
     sessionName: '',
     hostName: '',
     description: '',
-    deckType: 'fibonacci' as const,
+    deckType: 'fibonacci' as 'fibonacci' | 'tshirt' | 'powers' | 'custom',
     customDeck: ''
   })
 
@@ -43,7 +42,7 @@ export default function CreateSessionPage() {
         name: string
         description: string
         hostId: string
-        deckType: string
+        deckType: 'fibonacci' | 'tshirt' | 'powers' | 'custom'
         customDeck?: string[]
         participants: Array<{
           id: string
@@ -185,7 +184,7 @@ export default function CreateSessionPage() {
                                   ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
                                   : 'border-slate-200 hover:border-primary/50 hover:bg-slate-50 dark:border-slate-700 dark:hover:border-primary/50 dark:hover:bg-slate-800/50'
                               }`}
-                              onClick={() => setFormData({ ...formData, deckType: option.value as any })}
+                              onClick={() => setFormData({ ...formData, deckType: option.value as 'fibonacci' | 'tshirt' | 'powers' | 'custom' })}
                             >
                               <div className="flex items-start gap-4">
                                 <div className={`w-5 h-5 rounded-full border-2 mt-0.5 transition-all ${

@@ -13,15 +13,10 @@ import {
   Plus, 
   Play, 
   Eye, 
-  EyeOff, 
-  RotateCcw, 
-  Share2,
   Crown,
   Circle,
   CheckCircle2,
-  Clock,
-  Target,
-  PartyPopper
+  Target
 } from "lucide-react"
 import { subscribeToSession, addStory, startVoting, castVote, revealVotes, endVoting } from "@/lib/session-service"
 import type { Session, Story } from "@/types/session"

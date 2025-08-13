@@ -1,5 +1,4 @@
 import { 
-  collection, 
   doc, 
   getDoc, 
   setDoc, 
@@ -7,14 +6,12 @@ import {
   deleteDoc, 
   onSnapshot, 
   serverTimestamp,
-  arrayUnion,
-  arrayRemove,
   Timestamp 
 } from 'firebase/firestore'
 import { db } from './firebase'
-import type { Session, Participant, Story, Vote } from '@/types/session'
+import type { Session, Participant, Story } from '@/types/session'
 
-// Firestore document types
+// Firestore document types for proper timestamp handling
 interface FirestoreDoc {
   [key: string]: unknown
 }
@@ -57,7 +54,7 @@ export async function createSession(sessionData: Omit<Session, 'id' | 'createdAt
   const sessionRef = doc(db, 'sessions', roomCode)
   
   // Prepare session data, filtering out undefined values
-  const session: FirestoreDoc = {
+  const sessionBase = {
     ...sessionData,
     id: roomCode,
     createdAt: serverTimestamp(),
@@ -65,9 +62,10 @@ export async function createSession(sessionData: Omit<Session, 'id' | 'createdAt
   }
 
   // Remove undefined fields to prevent Firestore errors
-  Object.keys(session).forEach(key => {
-    if (session[key] === undefined) {
-      delete session[key]
+  const session: FirestoreDoc = {}
+  Object.entries(sessionBase).forEach(([key, value]) => {
+    if (value !== undefined) {
+      session[key] = value
     }
   })
 
@@ -326,7 +324,7 @@ export async function endVoting(sessionId: string, finalEstimate?: string): Prom
   const sessionRef = doc(db, 'sessions', sessionId)
   
   // Prepare update data
-  const updateData: FirestoreDoc = {
+  const updateData = {
     stories: updatedStories.map(s => ({
       ...s,
       createdAt: Timestamp.fromDate(s.createdAt),
@@ -341,10 +339,9 @@ export async function endVoting(sessionId: string, finalEstimate?: string): Prom
     })),
     votingInProgress: false,
     votesRevealed: false,
+    currentStoryId: null,
     updatedAt: serverTimestamp()
   }
-
-  updateData.currentStoryId = null
 
   await updateDoc(sessionRef, updateData)
 }

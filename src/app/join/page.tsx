@@ -60,9 +60,9 @@ export default function JoinSessionPage() {
 
       // Redirect to session
       router.push(`/session/${formData.sessionId.toUpperCase()}`)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error joining session:', error)
-      if (error.message === 'Session not found') {
+      if (error instanceof Error && error.message === 'Session not found') {
         alert('Session not found. Please check the room code and try again.')
       } else {
         alert('Failed to join session. Please try again.')
@@ -157,7 +157,7 @@ export default function JoinSessionPage() {
 
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-4">
-                Don't have a room code?
+                Don&apos;t have a room code?
               </p>
               <Link href="/create">
                 <Button variant="outline" className="w-full">
