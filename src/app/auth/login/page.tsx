@@ -59,11 +59,12 @@ export default function LoginPage() {
       await signInWithGoogle()
       toast.success("Welcome back! Redirecting to dashboard...")
     } catch (error: unknown) {
-      if ((error as any)?.code === 'auth/popup-closed-by-user') {
+      const errorCode = error && typeof error === 'object' && 'code' in error ? (error as { code: string }).code : ''
+      if (errorCode === 'auth/popup-closed-by-user') {
         toast.error("Sign-in cancelled")
-      } else if ((error as any)?.code === 'auth/network-request-failed') {
+      } else if (errorCode === 'auth/network-request-failed') {
         toast.error("Network error. Please check your connection.")
-      } else if ((error as any)?.code === 'auth/popup-blocked') {
+      } else if (errorCode === 'auth/popup-blocked') {
         toast.error("Popup blocked. Please allow popups and try again.")
       } else {
         toast.error("Failed to sign in. Please try again.")
@@ -81,7 +82,8 @@ export default function LoginPage() {
       toast.success("Welcome back! Redirecting to dashboard...")
     } catch (error: unknown) {
       // Handle specific Firebase Auth errors
-      switch ((error as any)?.code) {
+      const errorCode = error && typeof error === 'object' && 'code' in error ? (error as { code: string }).code : ''
+      switch (errorCode) {
         case 'auth/user-not-found':
           toast.error("No account found with this email address")
           break
@@ -130,7 +132,8 @@ export default function LoginPage() {
       toast.success("Account created successfully! Redirecting to dashboard...")
     } catch (error: unknown) {
       // Handle specific Firebase Auth errors
-      switch ((error as any)?.code) {
+      const errorCode = error && typeof error === 'object' && 'code' in error ? (error as { code: string }).code : ''
+      switch (errorCode) {
         case 'auth/email-already-in-use':
           toast.error("An account with this email already exists. Try signing in instead.")
           break
@@ -164,7 +167,8 @@ export default function LoginPage() {
       setResetEmail("")
     } catch (error: unknown) {
       // Handle specific Firebase Auth errors
-      switch ((error as any)?.code) {
+      const errorCode = error && typeof error === 'object' && 'code' in error ? (error as { code: string }).code : ''
+      switch (errorCode) {
         case 'auth/user-not-found':
           toast.error("No account found with this email address")
           break
