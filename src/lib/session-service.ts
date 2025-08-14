@@ -320,7 +320,7 @@ export async function deleteStory(sessionId: string, storyId: string): Promise<v
   const sessionRef = doc(db, 'sessions', sessionId)
   
   // If the story being deleted is currently being voted on, stop voting
-  const updateData: any = {
+  const updateData: Record<string, any> = {
     stories: updatedStories.map(s => ({
       ...s,
       createdAt: Timestamp.fromDate(s.createdAt),

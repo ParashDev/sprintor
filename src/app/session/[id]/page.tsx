@@ -155,7 +155,7 @@ export default function SessionPage() {
       unsubscribe()
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
-  }, [sessionId, router])
+  }, [sessionId, router, isFreshJoin])
 
   const handleReconnect = async () => {
     const userId = localStorage.getItem('sprintor_user_id')
@@ -611,7 +611,7 @@ export default function SessionPage() {
                             <>
                               <Target className="h-4 w-4" />
                               <span className="font-medium">Next:</span>
-                              <span className="text-muted-foreground">Estimate "{unestimatedStories[0].title.length > 20 ? unestimatedStories[0].title.substring(0, 20) + '...' : unestimatedStories[0].title}"</span>
+                              <span className="text-muted-foreground">Estimate &quot;{unestimatedStories[0].title.length > 20 ? unestimatedStories[0].title.substring(0, 20) + '...' : unestimatedStories[0].title}&quot;</span>
                             </>
                           )
                         } else if (storiesNeedingReview.length > 0) {
@@ -1175,7 +1175,7 @@ export default function SessionPage() {
           <DialogHeader>
             <DialogTitle>Delete Story</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{storyToDelete?.title}"? This action cannot be undone and will remove all voting history for this story.
+              Are you sure you want to delete &quot;{storyToDelete?.title}&quot;? This action cannot be undone and will remove all voting history for this story.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

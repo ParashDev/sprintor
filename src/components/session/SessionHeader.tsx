@@ -35,6 +35,8 @@ export function SessionHeader({ session, isHost, currentUserId }: SessionHeaderP
   const [isEndingSession, setIsEndingSession] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showEndSessionDialog, setShowEndSessionDialog] = useState(false)
+  const [showLeaveSessionDialog, setShowLeaveSessionDialog] = useState(false)
+  const [isLeavingSession, setIsLeavingSession] = useState(false)
 
   const handleCopyRoomCode = async () => {
     try {
@@ -46,24 +48,30 @@ export function SessionHeader({ session, isHost, currentUserId }: SessionHeaderP
     }
   }
 
-  const handleLeaveSession = async () => {
-    // For now, keep the browser confirm but we can replace this with a proper dialog later
-    if (confirm('Are you sure you want to leave this session?')) {
-      try {
-        await leaveSession(session.id, currentUserId)
-        // Clear ALL user session data for clean restart
-        localStorage.removeItem('sprintor_current_session')
-        localStorage.removeItem('sprintor_user_id')
-        localStorage.removeItem('sprintor_user_name')
-        router.push('/')
-      } catch (error) {
-        console.error('Error leaving session:', error)
-        // Still navigate away and clear all data even if the leave call fails
-        localStorage.removeItem('sprintor_current_session')
-        localStorage.removeItem('sprintor_user_id')
-        localStorage.removeItem('sprintor_user_name')
-        router.push('/')
-      }
+  const handleLeaveSession = () => {
+    setShowLeaveSessionDialog(true)
+  }
+
+  const confirmLeaveSession = async () => {
+    setIsLeavingSession(true)
+    try {
+      await leaveSession(session.id, currentUserId)
+      // Clear ALL user session data for clean restart
+      localStorage.removeItem('sprintor_current_session')
+      localStorage.removeItem('sprintor_user_id')
+      localStorage.removeItem('sprintor_user_name')
+      setShowLeaveSessionDialog(false)
+      router.push('/')
+    } catch (error) {
+      console.error('Error leaving session:', error)
+      // Still navigate away and clear all data even if the leave call fails
+      localStorage.removeItem('sprintor_current_session')
+      localStorage.removeItem('sprintor_user_id')
+      localStorage.removeItem('sprintor_user_name')
+      setShowLeaveSessionDialog(false)
+      router.push('/')
+    } finally {
+      setIsLeavingSession(false)
     }
   }
 
@@ -160,10 +168,11 @@ export function SessionHeader({ session, isHost, currentUserId }: SessionHeaderP
                   variant="outline"
                   size="sm"
                   onClick={handleLeaveSession}
+                  disabled={isLeavingSession}
                   className="h-9 gap-2"
                 >
                   <LogOut className="h-4 w-4" />
-                  <span className="hidden sm:inline">Leave</span>
+                  <span className="hidden sm:inline">{isLeavingSession ? 'Leaving...' : 'Leave'}</span>
                 </Button>
               )}
             </div>
@@ -186,6 +195,26 @@ export function SessionHeader({ session, isHost, currentUserId }: SessionHeaderP
             </Button>
             <Button variant="destructive" onClick={confirmEndSession} disabled={isEndingSession}>
               {isEndingSession ? 'Ending...' : 'End Session'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Leave Session Confirmation Dialog */}
+      <Dialog open={showLeaveSessionDialog} onOpenChange={setShowLeaveSessionDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Leave Session</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to leave this session? You can rejoin later using the room code if the session is still active.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowLeaveSessionDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmLeaveSession} disabled={isLeavingSession}>
+              {isLeavingSession ? 'Leaving...' : 'Leave Session'}
             </Button>
           </DialogFooter>
         </DialogContent>
