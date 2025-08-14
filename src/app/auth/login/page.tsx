@@ -58,12 +58,12 @@ export default function LoginPage() {
     try {
       await signInWithGoogle()
       toast.success("Welcome back! Redirecting to dashboard...")
-    } catch (error: Record<string, unknown>) {
-      if (error.code === 'auth/popup-closed-by-user') {
+    } catch (error: unknown) {
+      if ((error as any)?.code === 'auth/popup-closed-by-user') {
         toast.error("Sign-in cancelled")
-      } else if (error.code === 'auth/network-request-failed') {
+      } else if ((error as any)?.code === 'auth/network-request-failed') {
         toast.error("Network error. Please check your connection.")
-      } else if (error.code === 'auth/popup-blocked') {
+      } else if ((error as any)?.code === 'auth/popup-blocked') {
         toast.error("Popup blocked. Please allow popups and try again.")
       } else {
         toast.error("Failed to sign in. Please try again.")
@@ -79,9 +79,9 @@ export default function LoginPage() {
     try {
       await signInWithEmail(signInEmail, signInPassword)
       toast.success("Welcome back! Redirecting to dashboard...")
-    } catch (error: Record<string, unknown>) {
+    } catch (error: unknown) {
       // Handle specific Firebase Auth errors
-      switch (error.code) {
+      switch ((error as any)?.code) {
         case 'auth/user-not-found':
           toast.error("No account found with this email address")
           break
@@ -128,9 +128,9 @@ export default function LoginPage() {
     try {
       await signUpWithEmail(signUpEmail, signUpPassword, signUpName)
       toast.success("Account created successfully! Redirecting to dashboard...")
-    } catch (error: Record<string, unknown>) {
+    } catch (error: unknown) {
       // Handle specific Firebase Auth errors
-      switch (error.code) {
+      switch ((error as any)?.code) {
         case 'auth/email-already-in-use':
           toast.error("An account with this email already exists. Try signing in instead.")
           break
@@ -162,9 +162,9 @@ export default function LoginPage() {
       toast.success("Password reset email sent! Check your inbox and spam folder.")
       setShowResetPassword(false)
       setResetEmail("")
-    } catch (error: Record<string, unknown>) {
+    } catch (error: unknown) {
       // Handle specific Firebase Auth errors
-      switch (error.code) {
+      switch ((error as any)?.code) {
         case 'auth/user-not-found':
           toast.error("No account found with this email address")
           break
