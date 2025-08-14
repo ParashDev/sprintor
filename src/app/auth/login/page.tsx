@@ -58,7 +58,7 @@ export default function LoginPage() {
     try {
       await signInWithGoogle()
       toast.success("Welcome back! Redirecting to dashboard...")
-    } catch (error: Record<string, any>) {
+    } catch (error: Record<string, unknown>) {
       if (error.code === 'auth/popup-closed-by-user') {
         toast.error("Sign-in cancelled")
       } else if (error.code === 'auth/network-request-failed') {
@@ -79,7 +79,7 @@ export default function LoginPage() {
     try {
       await signInWithEmail(signInEmail, signInPassword)
       toast.success("Welcome back! Redirecting to dashboard...")
-    } catch (error: Record<string, any>) {
+    } catch (error: Record<string, unknown>) {
       // Handle specific Firebase Auth errors
       switch (error.code) {
         case 'auth/user-not-found':
@@ -128,7 +128,7 @@ export default function LoginPage() {
     try {
       await signUpWithEmail(signUpEmail, signUpPassword, signUpName)
       toast.success("Account created successfully! Redirecting to dashboard...")
-    } catch (error: Record<string, any>) {
+    } catch (error: Record<string, unknown>) {
       // Handle specific Firebase Auth errors
       switch (error.code) {
         case 'auth/email-already-in-use':
@@ -162,7 +162,7 @@ export default function LoginPage() {
       toast.success("Password reset email sent! Check your inbox and spam folder.")
       setShowResetPassword(false)
       setResetEmail("")
-    } catch (error: Record<string, any>) {
+    } catch (error: Record<string, unknown>) {
       // Handle specific Firebase Auth errors
       switch (error.code) {
         case 'auth/user-not-found':
@@ -262,7 +262,7 @@ export default function LoginPage() {
                 <CardHeader>
                   <CardTitle>Reset Password</CardTitle>
                   <CardDescription>
-                    Enter your email address and we'll send you a password reset link
+                    Enter your email address and we&apos;ll send you a password reset link
                   </CardDescription>
                 </CardHeader>
                 <CardContent>

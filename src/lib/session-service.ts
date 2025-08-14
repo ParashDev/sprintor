@@ -12,7 +12,8 @@ import {
   where,
   orderBy,
   limit,
-  getDocs
+  getDocs,
+  FieldValue
 } from 'firebase/firestore'
 import { db } from './firebase'
 import type { Session, Participant, Story } from '@/types/session'
@@ -320,7 +321,14 @@ export async function deleteStory(sessionId: string, storyId: string): Promise<v
   const sessionRef = doc(db, 'sessions', sessionId)
   
   // If the story being deleted is currently being voted on, stop voting
-  const updateData: Record<string, any> = {
+  const updateData: {
+    stories: any[]
+    updatedAt: any
+    currentStoryId?: null
+    votingInProgress?: boolean
+    votesRevealed?: boolean
+    participants?: any[]
+  } = {
     stories: updatedStories.map(s => ({
       ...s,
       createdAt: Timestamp.fromDate(s.createdAt),
