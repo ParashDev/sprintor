@@ -3,29 +3,46 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Users, UserPlus } from "lucide-react"
+import { useAuth } from "@/contexts/AuthContext"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { useState } from "react"
 
 export function Hero() {
+  const { user } = useAuth()
+  const router = useRouter()
+
+  const handleHostSession = () => {
+    if (!user) {
+      toast.message("Sign in required", {
+        description: "Please sign in to host a session and access advanced features"
+      })
+      router.push('/auth/login')
+    } else {
+      router.push('/create')
+    }
+  }
+
   return (
     <section className="relative overflow-hidden py-20 sm:py-32">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
           <div className="flex flex-col justify-center space-y-8 text-center lg:text-left">
-            <div className="space-y-6">
-              <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
-                Collaborative Sprint Planning for Agile Teams
+            <div className="space-y-4 sm:space-y-6">
+              <h1 className="text-3xl font-bold tracking-tight leading-tight sm:text-4xl sm:tracking-tighter md:text-5xl xl:text-6xl/none">
+                Collaborative Sprint Planning for 
+                <span className="block text-primary mt-1 sm:mt-0 sm:inline"> Agile Teams</span>
               </h1>
-              <p className="mx-auto lg:mx-0 max-w-[600px] text-muted-foreground md:text-xl">
-                Real-time sprint estimation with your distributed team. No servers, no sign-ups - just pure P2P collaboration.
+              <p className="mx-auto lg:mx-0 max-w-[600px] text-muted-foreground text-lg leading-relaxed md:text-xl">
+                Real-time sprint estimation with your distributed team. Sign in to host sessions with advanced features, or join anonymously.
               </p>
             </div>
             
             <div className="flex flex-col gap-4 sm:flex-row justify-center lg:justify-start">
-              <Link href="/create">
-                <Button size="lg" className="w-full sm:w-auto">
-                  <Users className="mr-2 h-5 w-5" />
-                  Host a Session
-                </Button>
-              </Link>
+              <Button size="lg" className="w-full sm:w-auto" onClick={handleHostSession}>
+                <Users className="mr-2 h-5 w-5" />
+                Host a Session
+              </Button>
               <Link href="/join">
                 <Button size="lg" variant="outline" className="w-full sm:w-auto">
                   <UserPlus className="mr-2 h-5 w-5" />
@@ -45,6 +62,12 @@ export function Hero() {
 }
 
 function PlanningCardsDemo() {
+  const [isActive, setIsActive] = useState(false)
+
+  const handleDeckClick = () => {
+    setIsActive(!isActive)
+  }
+
   return (
     <div className="relative w-full max-w-[500px] h-[280px] md:h-[320px] mx-auto px-4 md:px-0">
       {/* Dealt cards with perfect equal spacing using flexbox */}
@@ -106,24 +129,28 @@ function PlanningCardsDemo() {
       </div>
       
       {/* Card deck positioned exactly under the center card - fine-tuned */}
-      <div className="absolute bottom-8 group cursor-pointer z-10" style={{ left: 'calc(50% - 25px)', transform: 'translateX(-50%)' }}>
+      <div 
+        className="absolute bottom-8 group cursor-pointer z-10" 
+        style={{ left: 'calc(50% - 25px)', transform: 'translateX(-50%)' }}
+        onClick={handleDeckClick}
+      >
         {/* Bottom deck card */}
-        <div className="absolute w-[55px] h-[85px] md:w-[70px] md:h-[105px] rounded-lg md:rounded-xl border-2 md:border-4 border-primary shadow-md transition-all duration-200 opacity-80 bg-gradient-to-br from-muted to-muted-foreground/10 transform rotate-1 translate-x-0.5 translate-y-0.5 group-hover:translate-y-1">
+        <div className={`absolute w-[55px] h-[85px] md:w-[70px] md:h-[105px] rounded-lg md:rounded-xl border-2 md:border-4 border-primary shadow-md transition-all duration-200 opacity-80 bg-gradient-to-br from-muted to-muted-foreground/10 transform rotate-1 translate-x-0.5 translate-y-0.5 group-hover:translate-y-1 ${isActive ? 'translate-y-1' : ''}`}>
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 rounded-full opacity-30 bg-[repeating-linear-gradient(45deg,_theme(colors.border),_theme(colors.border)_2px,_transparent_2px,_transparent_8px)]"></div>
         </div>
         
         {/* Middle deck card */}
-        <div className="absolute w-[55px] h-[85px] md:w-[70px] md:h-[105px] rounded-lg md:rounded-xl border-2 md:border-4 border-primary shadow-md transition-all duration-200 opacity-90 bg-gradient-to-br from-muted to-muted-foreground/10 transform -rotate-1 -translate-x-0.5 -translate-y-0.5 group-hover:-translate-y-0.5 z-20">
+        <div className={`absolute w-[55px] h-[85px] md:w-[70px] md:h-[105px] rounded-lg md:rounded-xl border-2 md:border-4 border-primary shadow-md transition-all duration-200 opacity-90 bg-gradient-to-br from-muted to-muted-foreground/10 transform -rotate-1 -translate-x-0.5 -translate-y-0.5 group-hover:-translate-y-0.5 z-20 ${isActive ? '-translate-y-0.5' : ''}`}>
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 rounded-full opacity-30 bg-[repeating-linear-gradient(45deg,_theme(colors.border),_theme(colors.border)_2px,_transparent_2px,_transparent_8px)]"></div>
         </div>
         
         {/* Top deck card */}
-        <div className="absolute w-[55px] h-[85px] md:w-[70px] md:h-[105px] rounded-lg md:rounded-xl border-2 md:border-4 border-primary shadow-md transition-all duration-200 bg-gradient-to-br from-muted to-muted-foreground/10 transform rotate-2 group-hover:-translate-y-0.5 z-30">
+        <div className={`absolute w-[55px] h-[85px] md:w-[70px] md:h-[105px] rounded-lg md:rounded-xl border-2 md:border-4 border-primary shadow-md transition-all duration-200 bg-gradient-to-br from-muted to-muted-foreground/10 transform rotate-2 group-hover:-translate-y-0.5 z-30 ${isActive ? '-translate-y-0.5' : ''}`}>
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 md:w-10 md:h-10 rounded-full opacity-30 bg-[repeating-linear-gradient(45deg,_theme(colors.border),_theme(colors.border)_2px,_transparent_2px,_transparent_8px)]"></div>
         </div>
         
         {/* Animated dealing card */}
-        <div className="absolute w-[55px] h-[85px] md:w-[70px] md:h-[105px] bg-gradient-to-br from-background to-muted border-2 md:border-4 border-primary rounded-lg md:rounded-xl shadow-lg flex items-center justify-center text-2xl md:text-3xl font-bold text-primary opacity-0 transform rotate-2 transition-all duration-600 ease-out z-40 group-hover:opacity-100 group-hover:-translate-y-[120px] md:group-hover:-translate-y-[160px] group-hover:rotate-3 group-hover:scale-105">
+        <div className={`absolute w-[55px] h-[85px] md:w-[70px] md:h-[105px] bg-gradient-to-br from-background to-muted border-2 md:border-4 border-primary rounded-lg md:rounded-xl shadow-lg flex items-center justify-center text-2xl md:text-3xl font-bold text-primary opacity-0 transform rotate-2 transition-all duration-600 ease-out z-40 group-hover:opacity-100 group-hover:-translate-y-[120px] md:group-hover:-translate-y-[160px] group-hover:rotate-3 group-hover:scale-105 ${isActive ? 'opacity-100 -translate-y-[120px] md:-translate-y-[160px] rotate-3 scale-105' : ''}`}>
           ?
         </div>
       </div>

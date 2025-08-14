@@ -1,15 +1,17 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Users, Settings } from "lucide-react"
+import { Users, Settings, Loader2 } from "lucide-react"
 import { createSession } from "@/lib/session-service"
+import { useAuth } from "@/contexts/AuthContext"
+import { toast } from "sonner"
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader"
 
 const DECK_OPTIONS = [
   { value: 'fibonacci', label: 'Fibonacci (1, 2, 3, 5, 8, 13, 21)', description: 'Classic Fibonacci sequence for story points' },
@@ -19,28 +21,45 @@ const DECK_OPTIONS = [
 ]
 
 export default function CreateSessionPage() {
+  const { user, loading } = useAuth()
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     sessionName: '',
-    hostName: '',
     description: '',
     deckType: 'fibonacci' as 'fibonacci' | 'tshirt' | 'powers' | 'custom',
     customDeck: ''
   })
 
+  useEffect(() => {
+    // Redirect to login if not authenticated
+    if (!loading && !user) {
+      toast.error("Please sign in to host a session")
+      router.push('/auth/login')
+    }
+  }, [user, loading, router])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!user) {
+      toast.error("Please sign in to host a session")
+      router.push('/auth/login')
+      return
+    }
+
     setIsLoading(true)
 
     try {
       // Clear any existing session data first
       localStorage.removeItem('sprintor_current_session')
       
-      const hostId = Math.random().toString(36).substring(2, 9)
-      localStorage.setItem('sprintor_user_id', hostId)
-      localStorage.setItem('sprintor_user_name', formData.hostName)
+      // Use authenticated user's ID and name
+      localStorage.setItem('sprintor_user_id', user.uid)
+      localStorage.setItem('sprintor_user_name', user.displayName || user.email || 'Host')
 
+      const hostName = user.displayName || user.email || 'Host'
+      
       const sessionData: {
         name: string
         description: string
@@ -61,11 +80,11 @@ export default function CreateSessionPage() {
       } = {
         name: formData.sessionName,
         description: formData.description,
-        hostId,
+        hostId: user.uid,
         deckType: formData.deckType,
         participants: [{
-          id: hostId,
-          name: formData.hostName,
+          id: user.uid,
+          name: hostName,
           isHost: true,
           isOnline: true,
           lastSeen: new Date()
@@ -94,24 +113,37 @@ export default function CreateSessionPage() {
       router.push(`/session/${sessionId}?fresh=true`)
     } catch (error) {
       console.error('Error creating session:', error)
-      alert('Failed to create session. Please try again.')
+      toast.error('Failed to create session. Please try again.')
     } finally {
       setIsLoading(false)
     }
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null // Will redirect in useEffect
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      <DashboardHeader />
+      
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto space-y-8">
-          {/* Header with back button */}
+          {/* Page Header */}
           <div className="flex items-center justify-between">
-            <Link href="/">
-              <Button variant="ghost" size="sm" className="gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back to Home
-              </Button>
-            </Link>
+            <div>
+              <h1 className="text-3xl font-bold">Create New Session</h1>
+              <p className="text-muted-foreground mt-1">Set up your planning poker session</p>
+            </div>
             <div className="text-sm text-muted-foreground">
               Step 1 of 2: Session Setup
             </div>
@@ -121,7 +153,7 @@ export default function CreateSessionPage() {
           <div className="grid lg:grid-cols-3 gap-8">
             {/* Left column - Form */}
             <div className="lg:col-span-2">
-              <Card className="shadow-lg border-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-sm">
+              <Card className="shadow-lg">
                 <CardHeader className="space-y-6 pb-8">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-lg">
@@ -139,36 +171,19 @@ export default function CreateSessionPage() {
                 <CardContent className="space-y-8">
                   <form onSubmit={handleSubmit} className="space-y-8">
                     <div className="grid gap-6">
-                      <div className="grid sm:grid-cols-2 gap-6">
-                        <div className="space-y-3">
-                          <Label htmlFor="host-name" className="text-sm font-semibold">Your Name (Host)</Label>
-                          <Input
-                            id="host-name"
-                            value={formData.hostName}
-                            onChange={(e) => setFormData({ ...formData, hostName: e.target.value })}
-                            placeholder="John Smith"
-                            required
-                            className="h-12 text-base border-2 focus:border-primary"
-                          />
-                          <p className="text-sm text-muted-foreground">
-                            This is how participants will see you
-                          </p>
-                        </div>
-
-                        <div className="space-y-3">
-                          <Label htmlFor="session-name" className="text-sm font-semibold">Session Name</Label>
-                          <Input
-                            id="session-name"
-                            value={formData.sessionName}
-                            onChange={(e) => setFormData({ ...formData, sessionName: e.target.value })}
-                            placeholder="Sprint 24.1 Planning"
-                            required
-                            className="h-12 text-base border-2 focus:border-primary"
-                          />
-                          <p className="text-sm text-muted-foreground">
-                            Descriptive session name
-                          </p>
-                        </div>
+                      <div className="space-y-3">
+                        <Label htmlFor="session-name" className="text-sm font-semibold">Session Name</Label>
+                        <Input
+                          id="session-name"
+                          value={formData.sessionName}
+                          onChange={(e) => setFormData({ ...formData, sessionName: e.target.value })}
+                          placeholder="Sprint 24.1 Planning"
+                          required
+                          className="h-12 text-base border-2 focus:border-primary"
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          Descriptive session name
+                        </p>
                       </div>
 
                       <div className="space-y-3">
@@ -261,7 +276,7 @@ export default function CreateSessionPage() {
 
             {/* Right column - Info sidebar */}
             <div className="space-y-6">
-              <Card className="shadow-lg border-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-sm">
+              <Card className="shadow-lg">
                 <CardHeader>
                   <CardTitle className="text-lg font-semibold">What happens next?</CardTitle>
                 </CardHeader>
@@ -298,7 +313,7 @@ export default function CreateSessionPage() {
                 </CardContent>
               </Card>
 
-              <Card className="shadow-lg border-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-sm">
+              <Card className="shadow-lg">
                 <CardHeader>
                   <CardTitle className="text-lg font-semibold">Tips for better sessions</CardTitle>
                 </CardHeader>
@@ -314,7 +329,7 @@ export default function CreateSessionPage() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

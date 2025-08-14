@@ -6,7 +6,13 @@ import {
   deleteDoc, 
   onSnapshot, 
   serverTimestamp,
-  Timestamp 
+  Timestamp,
+  query,
+  collection,
+  where,
+  orderBy,
+  limit,
+  getDocs
 } from 'firebase/firestore'
 import { db } from './firebase'
 import type { Session, Participant, Story } from '@/types/session'
@@ -281,6 +287,66 @@ export async function addStory(sessionId: string, story: Omit<Story, 'id' | 'cre
   })
 }
 
+// Edit story in session
+export async function editStory(sessionId: string, storyId: string, updates: Partial<Pick<Story, 'title' | 'description'>>): Promise<void> {
+  const session = await getSession(sessionId)
+  if (!session) return
+
+  const updatedStories = session.stories.map(s => 
+    s.id === storyId ? { ...s, ...updates } : s
+  )
+  
+  const sessionRef = doc(db, 'sessions', sessionId)
+  await updateDoc(sessionRef, {
+    stories: updatedStories.map(s => ({
+      ...s,
+      createdAt: Timestamp.fromDate(s.createdAt),
+      votingHistory: s.votingHistory?.map(round => ({
+        ...round,
+        timestamp: Timestamp.fromDate(round.timestamp)
+      })) || []
+    })),
+    updatedAt: serverTimestamp()
+  })
+}
+
+// Delete story from session
+export async function deleteStory(sessionId: string, storyId: string): Promise<void> {
+  const session = await getSession(sessionId)
+  if (!session) return
+
+  const updatedStories = session.stories.filter(s => s.id !== storyId)
+  
+  const sessionRef = doc(db, 'sessions', sessionId)
+  
+  // If the story being deleted is currently being voted on, stop voting
+  const updateData: any = {
+    stories: updatedStories.map(s => ({
+      ...s,
+      createdAt: Timestamp.fromDate(s.createdAt),
+      votingHistory: s.votingHistory?.map(round => ({
+        ...round,
+        timestamp: Timestamp.fromDate(round.timestamp)
+      })) || []
+    })),
+    updatedAt: serverTimestamp()
+  }
+  
+  if (session.currentStoryId === storyId) {
+    updateData.currentStoryId = null
+    updateData.votingInProgress = false
+    updateData.votesRevealed = false
+    // Clear all votes
+    updateData.participants = session.participants.map(p => ({
+      ...p,
+      vote: null,
+      lastSeen: Timestamp.fromDate(p.lastSeen)
+    }))
+  }
+  
+  await updateDoc(sessionRef, updateData)
+}
+
 // Start voting for a story
 export async function startVoting(sessionId: string, storyId: string): Promise<void> {
   const sessionRef = doc(db, 'sessions', sessionId)
@@ -338,6 +404,49 @@ export async function endVoting(sessionId: string, finalEstimate?: string): Prom
   const session = await getSession(sessionId)
   if (!session || !session.currentStoryId) return
 
+  // Collect current votes and participant names
+  const votes: Record<string, string> = {}
+  const participantNames: Record<string, string> = {}
+  
+  session.participants.forEach(p => {
+    if (p.vote !== null && p.vote !== undefined) {
+      votes[p.id] = p.vote
+      participantNames[p.id] = p.name
+    }
+  })
+
+  // Auto-calculate final estimate if not provided
+  let calculatedEstimate = finalEstimate
+  if (!finalEstimate && Object.keys(votes).length > 0) {
+    const voteValues = Object.values(votes).filter(v => v !== '?')
+    
+    if (voteValues.length > 0) {
+      if (session.deckType === 'fibonacci' || session.deckType === 'powers') {
+        // For numeric decks, use average or most common value
+        const numericVotes = voteValues.filter(v => !isNaN(parseFloat(v))).map(v => parseFloat(v))
+        if (numericVotes.length > 0) {
+          const avg = numericVotes.reduce((sum, val) => sum + val, 0) / numericVotes.length
+          // Round to nearest deck value
+          const deckValues = session.deckType === 'fibonacci' 
+            ? [1, 2, 3, 5, 8, 13, 21] 
+            : [1, 2, 4, 8, 16, 32]
+          const closest = deckValues.reduce((prev, curr) => 
+            Math.abs(curr - avg) < Math.abs(prev - avg) ? curr : prev
+          )
+          calculatedEstimate = closest.toString()
+        }
+      } else {
+        // For non-numeric decks (T-shirt, custom), use most common vote
+        const counts: Record<string, number> = {}
+        voteValues.forEach(v => counts[v] = (counts[v] || 0) + 1)
+        const sortedVotes = Object.entries(counts).sort((a, b) => b[1] - a[1])
+        if (sortedVotes.length > 0) {
+          calculatedEstimate = sortedVotes[0][0]
+        }
+      }
+    }
+  }
+
   // Create voting round record
   const votingRound: {
     id: string
@@ -347,27 +456,19 @@ export async function endVoting(sessionId: string, finalEstimate?: string): Prom
     finalEstimate?: string
   } = {
     id: Math.random().toString(36).substring(2, 9),
-    votes: {},
-    participantNames: {},
+    votes,
+    participantNames,
     timestamp: new Date(),
-    ...(finalEstimate && { finalEstimate })
+    ...(calculatedEstimate && { finalEstimate: calculatedEstimate })
   }
-
-  // Collect current votes and participant names
-  session.participants.forEach(p => {
-    if (p.vote !== null && p.vote !== undefined) {
-      votingRound.votes[p.id] = p.vote
-      votingRound.participantNames[p.id] = p.name
-    }
-  })
 
   // Update the story with voting history and final estimate
   const updatedStories = session.stories.map(s => 
     s.id === session.currentStoryId 
       ? { 
           ...s, 
-          ...(finalEstimate && { estimate: finalEstimate }),
-          isEstimated: !!finalEstimate,
+          ...(calculatedEstimate && { estimate: calculatedEstimate }),
+          isEstimated: !!calculatedEstimate,
           votingHistory: [...(s.votingHistory || []), votingRound]
         }
       : s
@@ -405,15 +506,26 @@ export async function endVoting(sessionId: string, finalEstimate?: string): Prom
   await updateDoc(sessionRef, updateData)
 }
 
-// End session (mark as inactive)
+// End session (mark as inactive and all participants offline)
 export async function endSession(sessionId: string): Promise<void> {
   console.log('Ending session:', sessionId)
+  const session = await getSession(sessionId)
+  if (!session) return
+
+  // Mark all participants as offline
+  const updatedParticipants = session.participants.map(p => ({
+    ...p,
+    isOnline: false,
+    lastSeen: new Date()
+  }))
+
   const sessionRef = doc(db, 'sessions', sessionId)
   await updateDoc(sessionRef, {
     isActive: false,
+    participants: cleanParticipantsForFirestore(updatedParticipants),
     updatedAt: serverTimestamp()
   })
-  console.log('Session ended successfully')
+  console.log('Session ended successfully, all participants marked offline')
 }
 
 // Update participant heartbeat
@@ -477,4 +589,92 @@ export async function cleanupInactiveParticipants(sessionId: string): Promise<vo
 export async function deleteSession(sessionId: string): Promise<void> {
   const sessionRef = doc(db, 'sessions', sessionId)
   await deleteDoc(sessionRef)
+}
+
+// Get sessions by host (for dashboard)
+export async function getSessionsByHost(hostId: string, limitCount: number = 10): Promise<Session[]> {
+  try {
+    const sessionsRef = collection(db, 'sessions')
+    const q = query(
+      sessionsRef,
+      where('hostId', '==', hostId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    )
+    
+    const querySnapshot = await getDocs(q)
+    const sessions: Session[] = []
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      
+      const session: Session = {
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+        participants: data.participants?.map((p: FirestoreParticipant) => ({
+          ...p,
+          lastSeen: 'toDate' in p.lastSeen ? p.lastSeen.toDate() : p.lastSeen
+        })) || [],
+        stories: data.stories?.map((s: FirestoreStory) => ({
+          ...s,
+          createdAt: 'toDate' in s.createdAt ? s.createdAt.toDate() : s.createdAt,
+          votingHistory: s.votingHistory?.map((round: FirestoreVotingRound) => ({
+            ...round,
+            timestamp: 'toDate' in round.timestamp ? round.timestamp.toDate() : round.timestamp
+          })) || []
+        })) || []
+      } as Session
+      
+      sessions.push(session)
+    })
+    
+    return sessions
+  } catch (error) {
+    console.error('Error fetching sessions by host:', error)
+    return []
+  }
+}
+
+// Get session statistics for dashboard
+export async function getSessionStats(hostId: string): Promise<{
+  totalSessions: number
+  storiesEstimated: number
+  teamMembers: number
+  avgEstimationTime: string
+}> {
+  try {
+    const sessions = await getSessionsByHost(hostId, 100) // Get more for stats
+    
+    const totalSessions = sessions.length
+    let totalStoriesEstimated = 0
+    const uniqueParticipants = new Set<string>()
+    
+    sessions.forEach(session => {
+      // Count estimated stories
+      totalStoriesEstimated += session.stories.filter(s => s.isEstimated).length
+      
+      // Count unique participants (excluding host)
+      session.participants.forEach(p => {
+        if (!p.isHost) {
+          uniqueParticipants.add(p.name.toLowerCase())
+        }
+      })
+    })
+    
+    return {
+      totalSessions,
+      storiesEstimated: totalStoriesEstimated,
+      teamMembers: uniqueParticipants.size,
+      avgEstimationTime: '--' // Calculate this later if needed
+    }
+  } catch (error) {
+    console.error('Error calculating session stats:', error)
+    return {
+      totalSessions: 0,
+      storiesEstimated: 0,
+      teamMembers: 0,
+      avgEstimationTime: '--'
+    }
+  }
 }
