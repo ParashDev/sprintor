@@ -7,7 +7,7 @@ import { getStoriesByProject, getProjectStoryStats, updateStory, deleteStory } f
 import { getProjectsByOwner } from "@/lib/project-service"
 import type { Story } from "@/types/story"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
@@ -136,7 +136,7 @@ const StoryCardContent = React.memo(function StoryCardContent({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete Story</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to delete "{story.title}"? This action cannot be undone.
+                    Are you sure you want to delete &quot;{story.title}&quot;? This action cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
