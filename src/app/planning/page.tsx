@@ -3,7 +3,7 @@
 import React, { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
-import { getSessionsByHost, getSessionStats, getSessionsByProject, getProjectSessionStats } from "@/lib/session-service"
+import { getSessionsByProject, getProjectSessionStats } from "@/lib/session-service"
 import { getProjectsByOwner } from "@/lib/project-service"
 import type { Session } from "@/types/session"
 import { Button } from "@/components/ui/button"

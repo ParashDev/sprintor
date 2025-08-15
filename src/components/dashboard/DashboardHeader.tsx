@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
-import { Plus, Settings, LogOut, Loader2, Moon, Sun, Menu, X, ChevronDown, ChevronUp } from "lucide-react"
+import {Settings, LogOut, Loader2, Moon, Sun, Menu, X, ChevronDown, ChevronUp } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -27,7 +27,6 @@ import {
 export function DashboardHeader() {
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
-  const router = useRouter()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)

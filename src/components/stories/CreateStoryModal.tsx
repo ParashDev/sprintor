@@ -479,7 +479,7 @@ export default function CreateStoryModal({
                       <Label htmlFor="type">Type</Label>
                       <Select 
                         value={selectData.type}
-                        onValueChange={(value) => setSelectData(prev => ({...prev, type: value as any}))}
+                        onValueChange={(value) => setSelectData(prev => ({...prev, type: value as "story" | "epic" | "task" | "bug" | "spike"}))}
                       >
                         <SelectTrigger className="h-11">
                           <SelectValue />
@@ -498,7 +498,7 @@ export default function CreateStoryModal({
                       <Label htmlFor="priority">Priority</Label>
                       <Select 
                         value={selectData.priority}
-                        onValueChange={(value) => setSelectData(prev => ({...prev, priority: value as any}))}
+                        onValueChange={(value) => setSelectData(prev => ({...prev, priority: value as "Must Have" | "Should Have" | "Could Have" | "Won't Have"}))}
                       >
                         <SelectTrigger className="h-11">
                           <SelectValue />
@@ -507,7 +507,7 @@ export default function CreateStoryModal({
                           <SelectItem value="Must Have">Must Have</SelectItem>
                           <SelectItem value="Should Have">Should Have</SelectItem>
                           <SelectItem value="Could Have">Could Have</SelectItem>
-                          <SelectItem value="Won't Have">Won't Have</SelectItem>
+                          <SelectItem value="Won't Have">Won&apos;t Have</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -571,7 +571,7 @@ export default function CreateStoryModal({
                     <Label htmlFor="riskLevel">Risk Level</Label>
                     <Select 
                       value={selectData.riskLevel}
-                      onValueChange={(value) => setSelectData(prev => ({...prev, riskLevel: value as any}))}
+                      onValueChange={(value) => setSelectData(prev => ({...prev, riskLevel: value as "Low" | "Medium" | "High" | "Critical"}))}
                     >
                       <SelectTrigger className="h-11">
                         <SelectValue />
@@ -588,7 +588,7 @@ export default function CreateStoryModal({
                     <Label htmlFor="complexity">Complexity</Label>
                     <Select 
                       value={selectData.complexity}
-                      onValueChange={(value) => setSelectData(prev => ({...prev, complexity: value as any}))}
+                      onValueChange={(value) => setSelectData(prev => ({...prev, complexity: value as "Simple" | "Moderate" | "Complex" | "Epic"}))}
                     >
                       <SelectTrigger className="h-11">
                         <SelectValue />
@@ -632,7 +632,7 @@ export default function CreateStoryModal({
                     <Label htmlFor="confidence">Confidence</Label>
                     <Select 
                       value={selectData.estimationConfidence}
-                      onValueChange={(value) => setSelectData(prev => ({...prev, estimationConfidence: value as any}))}
+                      onValueChange={(value) => setSelectData(prev => ({...prev, estimationConfidence: value as "Low" | "Medium" | "High"}))}
                     >
                       <SelectTrigger className="h-11">
                         <SelectValue />

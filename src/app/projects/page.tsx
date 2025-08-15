@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState, useCallback, useMemo } from "react"
+import React, { useEffect, useState, } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { Button } from "@/components/ui/button"
@@ -27,9 +27,7 @@ export default function ProjectsPage() {
   const router = useRouter()
   const [projects, setProjects] = useState<Project[]>([])
   const [loadingProjects, setLoadingProjects] = useState(true)
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  
-  const [creatingProject, setCreatingProject] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)  
 
   useEffect(() => {
     // Redirect to login if not authenticated
