@@ -39,6 +39,7 @@ import {
   DragOverlay,
   DragStartEvent,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   closestCenter,
@@ -214,7 +215,7 @@ const StoryCard = function StoryCard({ story, onEdit, onDelete, isDeleting }: St
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={{...style, touchAction: 'none'}}
       className="bg-white dark:bg-gray-800 border rounded-lg p-3 mb-3 shadow-sm cursor-grab active:cursor-grabbing"
       {...attributes}
       {...listeners}
@@ -322,11 +323,17 @@ function StoriesContent() {
   const [activeStory, setActiveStory] = useState<Story | null>(null)
   const [isDraggedOver, setIsDraggedOver] = useState<string | null>(null)
   
-  // Drag sensors - research-optimized configuration
+  // Drag sensors - mobile & desktop optimized
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // Optimal distance from research
+        distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
       },
     })
   )

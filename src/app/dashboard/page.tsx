@@ -155,21 +155,21 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Analytics Dashboard</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold">Analytics Dashboard</h1>
             <p className="text-muted-foreground mt-1">Track your planning performance and team productivity</p>
           </div>
-          <div className="flex gap-2">
-            <Button asChild variant="outline">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button asChild variant="outline" size="sm" className="sm:size-default">
               <Link href="/planning">
                 <Calendar className="mr-2 h-4 w-4" />
                 View Sessions
               </Link>
             </Button>
-            <Button asChild size="lg">
+            <Button asChild size="sm" className="sm:size-lg">
               <Link href="/create">
-                <Plus className="mr-2 h-5 w-5" />
+                <Plus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
                 New Session
               </Link>
             </Button>
