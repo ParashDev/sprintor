@@ -62,6 +62,44 @@ service cloud.firestore {
       allow delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
     }
     
+    // Stories collection
+    match /stories/{storyId} {
+      // Allow read/write if user owns the project
+      allow read, write: if request.auth != null && 
+        ((request.resource.data.projectId != null && isProjectOwner(request.resource.data.projectId)) ||
+         (resource != null && resource.data.projectId != null && isProjectOwner(resource.data.projectId)));
+    }
+    
+    // Epics collection
+    match /epics/{epicId} {
+      // Allow read/write if user owns the project
+      allow read, write: if request.auth != null && 
+        ((request.resource.data.projectId != null && isProjectOwner(request.resource.data.projectId)) ||
+         (resource != null && resource.data.projectId != null && isProjectOwner(resource.data.projectId)));
+    }
+    
+    // Story templates collection
+    match /storyTemplates/{templateId} {
+      // Allow all authenticated users to read templates
+      allow read: if request.auth != null;
+      
+      // Allow any authenticated user to create templates (global or project-specific)
+      allow create: if request.auth != null;
+      
+      // Allow any authenticated user to update templates (for now, can be restricted later)
+      allow update: if request.auth != null;
+      
+      // Allow any authenticated user to delete templates (for now, can be restricted later)  
+      allow delete: if request.auth != null;
+    }
+    
+    // Helper function to check if user owns a project
+    function isProjectOwner(projectId) {
+      return projectId != null && 
+             exists(/databases/$(database)/documents/projects/$(projectId)) &&
+             get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid;
+    }
+    
     // Deny all other access
     match /{document=**} {
       allow read, write: if false;
