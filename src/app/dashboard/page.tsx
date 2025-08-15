@@ -449,7 +449,7 @@ export default function DashboardPage() {
                       <div className="p-3 border rounded-lg">
                         <h4 className="font-medium text-sm mb-1">Activity Level</h4>
                         <p className="text-xs text-muted-foreground">
-                          You've hosted <strong>{analytics.recentActivity} sessions</strong> in the last 30 days with <strong>{analytics.totalParticipants} unique participants</strong>.
+                          You&apos;ve hosted <strong>{analytics.recentActivity} sessions</strong> in the last 30 days with <strong>{analytics.totalParticipants} unique participants</strong>.
                         </p>
                       </div>
                     </div>
@@ -497,7 +497,7 @@ export default function DashboardPage() {
                       <div className="p-3 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg">
                         <h4 className="font-medium text-sm text-purple-900 dark:text-purple-100">Get Started</h4>
                         <p className="text-xs text-purple-700 dark:text-purple-300">
-                          Create your first planning session to start tracking your team's estimation performance.
+                          Create your first planning session to start tracking your team&apos;s estimation performance.
                         </p>
                       </div>
                     )}

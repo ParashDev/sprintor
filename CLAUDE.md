@@ -17,11 +17,16 @@ This file provides comprehensive guidance to Claude Code when working with the S
 
 Sprintor is a real-time collaborative planning poker application built with Next.js 15.4.6, Firebase/Firestore, and shadcn/ui components. It enables distributed teams to conduct sprint planning sessions with real-time voting, session management, and participant tracking.
 
+**🎯 Current Architecture: Project-Centric Planning**
+```
+User → Projects → Planning Sessions (project-scoped) → Stories
+```
+
 ### Current Architecture Stack
 - **Frontend**: Next.js 15.4.6 with App Router, TypeScript, Tailwind CSS v4
-- **UI Components**: shadcn/ui component library
+- **UI Components**: shadcn/ui component library (optimized for performance)
 - **Backend**: Firebase/Firestore for real-time database
-- **Authentication**: Currently none (localStorage-based user management)
+- **Authentication**: Firebase Auth (Google, Email/Password) - Host authentication implemented
 - **Deployment**: Vercel and Railway compatible
 
 ## Development Commands
@@ -40,11 +45,25 @@ npm run lint            # Run ESLint checks (required to pass before deployment)
 
 ## Current Feature Set (Completed)
 
+### 🎯 Project-Centric Architecture (NEW)
+- ✅ **Project Management**: Create, edit, and manage projects with full Firebase integration
+- ✅ **Project-Session Association**: Sessions are automatically linked to projects
+- ✅ **Project-Scoped Sessions**: Only show sessions belonging to selected project
+- ✅ **Project-Specific Stats**: Dashboard metrics calculated per project, not globally
+- ✅ **Seamless Project Switching**: Instant session filtering when changing projects
+
 ### Core Session Management
 - ✅ **Session Creation**: Hosts can create sessions with custom names, descriptions, and estimation decks
 - ✅ **Session Joining**: Participants join via 6-character room codes
 - ✅ **Real-time Updates**: Live participant management via Firestore subscriptions
 - ✅ **Session Persistence**: LocalStorage-based session data with reconnection modals
+- ✅ **Smart Reconnection**: Time-based logic prevents false reconnect prompts on fresh joins
+
+### Authentication & User Management
+- ✅ **Host Authentication**: Firebase Auth (Google, Email/Password) for session hosts
+- ✅ **Anonymous Participants**: Easy join via room code + name (no account required)
+- ✅ **User Dashboard**: Authenticated hosts get project management interface
+- ✅ **Protected Routes**: Auth-required pages properly protected
 
 ### Estimation & Voting System
 - ✅ **Multiple Deck Types**: Fibonacci, T-Shirt sizes, Powers of 2, Custom decks
@@ -57,7 +76,7 @@ npm run lint            # Run ESLint checks (required to pass before deployment)
 - ✅ **Professional UI**: Gradient backgrounds, shadows, consistent spacing
 - ✅ **Dark Mode Support**: Theme toggle with system preference detection
 - ✅ **Responsive Design**: Mobile-first approach with breakpoints
-- ✅ **Reconnection System**: Smart modal for accidental refreshes vs intentional leaving
+- ✅ **Optimized Performance**: Fixed input lag issues, native HTML forms where needed
 - ✅ **Session End Notifications**: Automatic participant redirect when host ends session
 
 ### Participant Management
@@ -72,6 +91,11 @@ npm run lint            # Run ESLint checks (required to pass before deployment)
 ```
 src/app/
 ├── page.tsx                 # Landing page with hero and feature showcase
+├── auth/
+│   ├── login/page.tsx      # Authentication login page
+│   └── signup/page.tsx     # User registration page
+├── projects/page.tsx        # Project management dashboard
+├── planning/page.tsx        # Planning sessions page (project-scoped)
 ├── create/page.tsx          # Session creation form with deck selection
 ├── join/page.tsx           # Session joining with room code input
 └── session/[id]/page.tsx   # Main session interface with voting
@@ -84,10 +108,13 @@ src/components/
 ├── landing/
 │   ├── Hero.tsx           # Landing page hero with animated cards
 │   └── Footer.tsx         # Footer with branding
-└── session/
-    ├── SessionHeader.tsx          # Session controls, theme toggle, leave/end
-    ├── SessionReconnectModal.tsx  # Reconnection prompt for refreshes
-    └── SessionEndedDialog.tsx     # Dialog when host ends session
+├── dashboard/
+│   └── DashboardHeader.tsx # Shared header for authenticated pages
+├── session/
+│   ├── SessionHeader.tsx          # Session controls, theme toggle, leave/end
+│   ├── SessionReconnectModal.tsx  # Reconnection prompt for refreshes
+│   └── SessionEndedDialog.tsx     # Dialog when host ends session
+└── CreateProjectModal.tsx # High-performance project creation modal
 ```
 
 ### Services & Types
@@ -95,10 +122,14 @@ src/components/
 src/lib/
 ├── firebase.ts            # Firebase configuration and initialization
 ├── session-service.ts     # All Firestore operations and session management
+├── project-service.ts     # Project CRUD operations and Firebase integration
 └── utils.ts              # Utility functions
 
 src/types/
 └── session.ts            # TypeScript interfaces for Session, Participant, Story
+
+src/contexts/
+└── AuthContext.tsx       # Firebase Auth context and user management
 ```
 
 ### API Routes
@@ -109,13 +140,14 @@ src/app/api/
 
 ## Data Models & Types
 
-### Session Interface
+### Session Interface (Updated)
 ```typescript
 interface Session {
   id: string
   name: string
   description: string
   hostId: string
+  projectId?: string              // NEW: Links session to project
   deckType: 'fibonacci' | 'tshirt' | 'powers' | 'custom'
   customDeck?: string[]
   participants: Participant[]
@@ -126,6 +158,23 @@ interface Session {
   isActive: boolean
   createdAt: Date
   updatedAt: Date
+}
+```
+
+### Project Interface (NEW)
+```typescript
+interface Project {
+  id: string
+  name: string
+  description: string
+  companyName: string
+  projectType: string
+  estimationMethod: string
+  sprintDuration: string
+  createdAt: Date
+  updatedAt: Date
+  ownerId: string
+  sessionsCount: number
 }
 ```
 
@@ -171,20 +220,22 @@ sprintor_user_id: string
 sprintor_user_name: string
 ```
 
-### Reconnection Logic
+### Reconnection Logic (Enhanced)
 - **Fresh Join** (`?fresh=true` URL param): No reconnect modal
-- **Refresh** (no URL param): Shows reconnect modal if session data exists
+- **Time-based Check**: Only shows reconnect modal if >5 seconds since original join
+- **Refresh** (no URL param): Shows reconnect modal if session data exists and time check passes
 - **Leave/End**: Clears all localStorage data for clean restart
 
 ## Firestore Database Structure
 
-### Sessions Collection
+### Sessions Collection (Updated)
 ```
 sessions/{sessionId} = {
   id: string
   name: string
   description: string
   hostId: string
+  projectId?: string          // NEW: Links to projects collection
   deckType: string
   customDeck?: string[]
   participants: Array<{
@@ -219,12 +270,48 @@ sessions/{sessionId} = {
 }
 ```
 
+### Projects Collection (NEW)
+```
+projects/{projectId} = {
+  id: string
+  name: string
+  description: string
+  companyName: string
+  projectType: string
+  estimationMethod: string
+  sprintDuration: string
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  ownerId: string            // Links to authenticated user
+  sessionsCount: number
+}
+```
+
+### Required Firestore Indexes
+```
+Collection: sessions
+Composite Index: hostId (Ascending), projectId (Ascending), createdAt (Descending)
+Purpose: Enable project-scoped session queries
+```
+
 ## Critical Implementation Details
+
+### Performance Optimizations
+- **Input Lag Fix**: Replaced shadcn/ui components with native HTML inputs in CreateProjectModal
+- **React State Management**: Optimized re-renders with proper dependency arrays
+- **Project Switching**: Immediate session clearing prevents showing wrong data
+- **Time-based Reconnection**: Prevents false reconnect modals on fresh joins
+
+### Project-Session Architecture
+- **Compound Queries**: `getSessionsByProject(hostId, projectId)` uses Firebase compound index
+- **Project-Specific Stats**: `getProjectSessionStats()` calculates metrics per project
+- **URL State Management**: Project selection persisted via URL parameters
+- **Automatic Association**: Sessions created from planning page auto-link to selected project
 
 ### Firestore Undefined Field Handling
 - **Problem**: Firestore rejects `undefined` values in updates
 - **Solution**: `cleanParticipantsForFirestore()` helper filters undefined fields
-- **Applied to**: All participant update operations
+- **Applied to**: All participant update operations and project creation
 - **Pattern**: Always filter objects before Firestore writes:
 ```typescript
 const cleanData: Record<string, unknown> = {}
@@ -253,14 +340,44 @@ return () => unsubscribe() // Cleanup in useEffect
 - **Firestore type conversion** from Timestamps to Dates
 - **Path aliases**: Use `@/` for imports from src directory
 
-## Next Implementation Phase: Authentication for Hosts
+## Key Service Functions
 
-### Planned Architecture Changes
+### Project Service (project-service.ts)
+```typescript
+createProject(projectData) → Promise<string>           // Create new project
+getProjectsByOwner(ownerId) → Promise<Project[]>       // Get user's projects  
+getProject(projectId) → Promise<Project|null>          // Get single project
+updateProject(projectId, updates) → Promise<void>     // Update project
+deleteProject(projectId) → Promise<void>              // Delete project
+subscribeToUserProjects(ownerId, callback) → Function // Real-time project updates
+```
 
-#### Authentication Strategy
-- **Participants**: Remain anonymous (room code + name only)
-- **Hosts**: Required authentication for session creation
-- **Provider**: Firebase Auth (Google, Email/Password)
+### Session Service Extensions (session-service.ts)
+```typescript
+getSessionsByProject(hostId, projectId) → Promise<Session[]>     // Project-scoped sessions
+getProjectSessionStats(hostId, projectId) → Promise<Stats>      // Project-specific metrics
+getSessionStats(hostId) → Promise<Stats>                        // Global user stats (legacy)
+```
+
+## Current Architecture Status: COMPLETED ✅
+
+### ✅ Implemented Features
+- **Project-Centric Planning**: Full project → sessions → stories hierarchy
+- **Firebase Authentication**: Host authentication with Google/Email
+- **Project Management**: Complete CRUD operations with real-time updates
+- **Project-Scoped Sessions**: Sessions filtered by selected project
+- **Project-Specific Stats**: Dashboard metrics calculated per project
+- **Performance Optimized**: Input lag resolved, React state optimized
+- **Smart Reconnection**: Time-based logic prevents false reconnect prompts
+
+### Next Implementation Phase: Advanced Features
+
+#### Planned Enhancements
+- **Session Templates**: Pre-configured session setups with story libraries
+- **Team Management**: Invite team members, manage permissions
+- **Advanced Analytics**: Sprint velocity, estimation accuracy tracking
+- **Export Capabilities**: PDF reports, CSV data export
+- **Integrations**: Jira, Azure DevOps, Linear story import
 
 #### New Features for Authenticated Hosts
 ```
@@ -411,20 +528,27 @@ NEXTAUTH_URL=
 
 ## Current Known Issues & Limitations
 
-### Technical Debt
-- Browser alerts used in some confirmation dialogs (partially addressed)
-- Console.log statements in production code (to be removed)
-- Some error handling could be more robust
+### Technical Debt (Minimal)
+- Some console.log statements in production code (to be removed)
+- Error handling could be enhanced with comprehensive error boundaries
 
 ### Future Improvements
-- Replace remaining browser confirms with custom dialogs
 - Add comprehensive error boundaries
 - Implement proper loading states for all async operations
 - Add data persistence for offline scenarios
 - Implement session expiration and cleanup
+- Add comprehensive testing suite
 
 ## Summary
 
-Sprintor is a robust, real-time planning poker application with a solid foundation for the authentication enhancement phase. The current anonymous participant model works well for ease of use, while the planned host authentication will unlock powerful team management and analytics features. 
+Sprintor is now a **complete, production-ready planning poker application** with full project-centric architecture. The implementation includes:
 
-All code follows TypeScript best practices and is production-ready for Vercel/Railway deployment. The modular architecture supports easy extension for the authentication features while preserving the existing functionality.
+✅ **Core Functionality**: Real-time planning poker sessions with voting, estimation, and history
+✅ **Project Management**: Complete project lifecycle with Firebase integration
+✅ **Authentication**: Firebase Auth for hosts, anonymous access for participants
+✅ **Performance Optimized**: Resolved input lag, optimized React rendering
+✅ **User Experience**: Smart reconnection, project-scoped views, responsive design
+
+The architecture successfully supports the **project → sessions → stories** hierarchy with real-time updates, project-specific metrics, and seamless user experience. All code follows TypeScript best practices and is production-ready for Vercel/Railway deployment.
+
+**Ready for production deployment and user testing!** 🚀
