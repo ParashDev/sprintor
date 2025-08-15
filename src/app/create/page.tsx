@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -23,6 +23,8 @@ const DECK_OPTIONS = [
 export default function CreateSessionPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const projectId = searchParams.get('project')
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     sessionName: '',
@@ -64,6 +66,7 @@ export default function CreateSessionPage() {
         name: string
         description: string
         hostId: string
+        projectId?: string
         deckType: 'fibonacci' | 'tshirt' | 'powers' | 'custom'
         customDeck?: string[]
         participants: Array<{
@@ -81,6 +84,7 @@ export default function CreateSessionPage() {
         name: formData.sessionName,
         description: formData.description,
         hostId: user.uid,
+        projectId: projectId || undefined,
         deckType: formData.deckType,
         participants: [{
           id: user.uid,

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Modal</title>
+    <style>
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border: 1px solid #ccc;
+            z-index: 1000;
+        }
+        .backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <button onclick="showModal()">Open Modal</button>
+    
+    <div id="backdrop" class="backdrop" style="display: none;" onclick="hideModal()"></div>
+    <div id="modal" class="modal" style="display: none;">
+        <h3>Test Form</h3>
+        <input type="text" placeholder="Project Name" id="name">
+        <input type="text" placeholder="Company" id="company">
+        <textarea placeholder="Description" id="description"></textarea>
+        <button onclick="hideModal()">Close</button>
+    </div>
+
+    <script>
+        function showModal() {
+            document.getElementById('backdrop').style.display = 'block';
+            document.getElementById('modal').style.display = 'block';
+        }
+        
+        function hideModal() {
+            document.getElementById('backdrop').style.display = 'none';
+            document.getElementById('modal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

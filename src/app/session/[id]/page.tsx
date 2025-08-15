@@ -82,26 +82,34 @@ export default function SessionPage() {
     
     setCurrentUserId(userId)
     
-    // Clean up the fresh parameter from URL after processing
-    if (isFreshJoin) {
-      const newUrl = window.location.pathname
-      window.history.replaceState({}, '', newUrl)
-    }
-    
     // Check if there's stored session data for potential reconnection
     // Only show reconnect modal if this is NOT a fresh join from create/join pages
     if (currentSessionData && !isFreshJoin) {
       try {
         const sessionInfo = JSON.parse(currentSessionData)
         if (sessionInfo.sessionId === sessionId) {
-          setStoredSessionInfo(sessionInfo)
-          // Show modal after a short delay to let session load first
-          setTimeout(() => setShowReconnectModal(true), 1000)
+          // Additional check: only show reconnect modal if the user joined more than 5 seconds ago
+          // This prevents the modal from showing on fresh joins where localStorage was just set
+          const joinedAt = new Date(sessionInfo.joinedAt)
+          const now = new Date()
+          const timeSinceJoin = now.getTime() - joinedAt.getTime()
+          
+          if (timeSinceJoin > 5000) { // 5 seconds
+            setStoredSessionInfo(sessionInfo)
+            // Show modal after a short delay to let session load first
+            setTimeout(() => setShowReconnectModal(true), 1000)
+          }
         }
       } catch (error) {
         console.error('Error parsing stored session data:', error)
         localStorage.removeItem('sprintor_current_session')
       }
+    }
+    
+    // Clean up the fresh parameter from URL after processing (moved after reconnect logic)
+    if (isFreshJoin) {
+      const newUrl = window.location.pathname
+      window.history.replaceState({}, '', newUrl)
     }
     
     // Subscribe to session updates (back to the original working way)

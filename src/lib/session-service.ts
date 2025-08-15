@@ -598,6 +598,52 @@ export async function deleteSession(sessionId: string): Promise<void> {
   await deleteDoc(sessionRef)
 }
 
+// Get sessions by project and host
+export async function getSessionsByProject(hostId: string, projectId: string, limitCount: number = 10): Promise<Session[]> {
+  try {
+    const sessionsRef = collection(db, 'sessions')
+    const q = query(
+      sessionsRef,
+      where('hostId', '==', hostId),
+      where('projectId', '==', projectId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    )
+    
+    const querySnapshot = await getDocs(q)
+    const sessions: Session[] = []
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      
+      const session: Session = {
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+        participants: data.participants?.map((p: FirestoreParticipant) => ({
+          ...p,
+          lastSeen: 'toDate' in p.lastSeen ? p.lastSeen.toDate() : p.lastSeen
+        })) || [],
+        stories: data.stories?.map((s: FirestoreStory) => ({
+          ...s,
+          createdAt: 'toDate' in s.createdAt ? s.createdAt.toDate() : s.createdAt,
+          votingHistory: s.votingHistory?.map((round: FirestoreVotingRound) => ({
+            ...round,
+            timestamp: 'toDate' in round.timestamp ? round.timestamp.toDate() : round.timestamp
+          })) || []
+        })) || []
+      } as Session
+      
+      sessions.push(session)
+    })
+    
+    return sessions
+  } catch (error) {
+    console.error('Error fetching sessions by project:', error)
+    return []
+  }
+}
+
 // Get sessions by host (for dashboard)
 export async function getSessionsByHost(hostId: string, limitCount: number = 10): Promise<Session[]> {
   try {
@@ -677,6 +723,49 @@ export async function getSessionStats(hostId: string): Promise<{
     }
   } catch (error) {
     console.error('Error calculating session stats:', error)
+    return {
+      totalSessions: 0,
+      storiesEstimated: 0,
+      teamMembers: 0,
+      avgEstimationTime: '--'
+    }
+  }
+}
+
+// Get project-specific session statistics
+export async function getProjectSessionStats(hostId: string, projectId: string): Promise<{
+  totalSessions: number
+  storiesEstimated: number
+  teamMembers: number
+  avgEstimationTime: string
+}> {
+  try {
+    const sessions = await getSessionsByProject(hostId, projectId, 100) // Get more for stats
+    
+    const totalSessions = sessions.length
+    let totalStoriesEstimated = 0
+    const uniqueParticipants = new Set<string>()
+    
+    sessions.forEach(session => {
+      // Count estimated stories
+      totalStoriesEstimated += session.stories.filter(s => s.isEstimated).length
+      
+      // Count unique participants (excluding host)
+      session.participants.forEach(p => {
+        if (!p.isHost) {
+          uniqueParticipants.add(p.name.toLowerCase())
+        }
+      })
+    })
+    
+    return {
+      totalSessions,
+      storiesEstimated: totalStoriesEstimated,
+      teamMembers: uniqueParticipants.size,
+      avgEstimationTime: '--' // Calculate this later if needed
+    }
+  } catch (error) {
+    console.error('Error calculating project session stats:', error)
     return {
       totalSessions: 0,
       storiesEstimated: 0,

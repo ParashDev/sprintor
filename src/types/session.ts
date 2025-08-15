@@ -30,6 +30,7 @@ export interface Session {
   name: string
   description?: string
   hostId: string
+  projectId?: string
   deckType: 'fibonacci' | 'tshirt' | 'powers' | 'custom'
   customDeck?: string[]
   participants: Participant[]

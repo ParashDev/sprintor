@@ -74,16 +74,16 @@ export function DashboardHeader() {
                 Dashboard
               </Link>
               <Link 
-                href="#" 
+                href="/projects" 
                 className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
               >
-                Teams
+                Projects
               </Link>
               <Link 
-                href="#" 
+                href="/planning" 
                 className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
               >
-                Analytics
+                Planning
               </Link>
 
               {mounted && (
@@ -188,18 +188,18 @@ export function DashboardHeader() {
                     Dashboard
                   </Link>
                   <Link
-                    href="#"
+                    href="/projects"
                     className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-colors"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Teams
+                    Projects
                   </Link>
                   <Link
-                    href="#"
+                    href="/planning"
                     className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-colors"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Analytics
+                    Planning
                   </Link>
                 </nav>
 
