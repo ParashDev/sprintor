@@ -15,11 +15,9 @@ import { Badge } from "@/components/ui/badge"
 import { 
   Plus, 
   BookOpen, 
-  Users, 
   Loader2,
   CheckCircle2,
   Clock,
-  AlertTriangle,
   Target,
   Search,
   Filter,

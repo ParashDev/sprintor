@@ -11,10 +11,8 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { FormField } from "./FormField"
-// Removed shadcn Dialog - using custom modal
+
 import {
   Plus,
   Search,
@@ -456,7 +454,9 @@ export default function CreateStoryModal({
                   <div className="space-y-2">
                     <Label htmlFor="title">Title *</Label>
                     <Input
-                      ref={(el) => formRefs.current.title = el}
+                      ref={(el) => {
+                        if (formRefs.current) formRefs.current.title = el
+                      }}
                       id="title"
                       placeholder="Story title"
                       className="h-11"
@@ -466,7 +466,9 @@ export default function CreateStoryModal({
                   <div className="space-y-2">
                     <Label htmlFor="description">Description</Label>
                     <Textarea
-                      ref={(el) => formRefs.current.description = el}
+                      ref={(el) => {
+                        if (formRefs.current) formRefs.current.description = el
+                      }}
                       id="description"
                       placeholder="Detailed description"
                       rows={4}
@@ -523,7 +525,9 @@ export default function CreateStoryModal({
                     <div className="space-y-2">
                       <Label htmlFor="asA">As a</Label>
                       <Input
-                        ref={(el) => formRefs.current.asA = el}
+                        ref={(el) => {
+                          if (formRefs.current) formRefs.current.asA = el
+                        }}
                         id="asA"
                         placeholder="user role"
                         className="h-11"
@@ -532,7 +536,9 @@ export default function CreateStoryModal({
                     <div className="space-y-2">
                       <Label htmlFor="iWant">I want</Label>
                       <Input
-                        ref={(el) => formRefs.current.iWant = el}
+                        ref={(el) => {
+                          if (formRefs.current) formRefs.current.iWant = el
+                        }}
                         id="iWant"
                         placeholder="functionality desired"
                         className="h-11"
@@ -541,7 +547,9 @@ export default function CreateStoryModal({
                     <div className="space-y-2">
                       <Label htmlFor="soThat">So that</Label>
                       <Input
-                        ref={(el) => formRefs.current.soThat = el}
+                        ref={(el) => {
+                          if (formRefs.current) formRefs.current.soThat = el
+                        }}
                         id="soThat"
                         placeholder="business value achieved"
                         className="h-11"
@@ -622,7 +630,9 @@ export default function CreateStoryModal({
                   <div className="space-y-2">
                     <Label htmlFor="timeEstimate">Time Estimate</Label>
                     <Input
-                      ref={(el) => formRefs.current.timeEstimate = el}
+                      ref={(el) => {
+                        if (formRefs.current) formRefs.current.timeEstimate = el
+                      }}
                       id="timeEstimate"
                       placeholder="2-4 hours, 1-2 days"
                       className="h-11"
