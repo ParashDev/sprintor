@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useAuth } from "@/contexts/AuthContext"
-import { createStory, getStoryTemplates } from "@/lib/story-service"
-import type { StoryTemplate } from "@/types/story"
+import { createStory, updateStory, getStoryTemplates } from "@/lib/story-service"
+import type { StoryTemplate, Story } from "@/types/story"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -32,13 +32,15 @@ interface CreateStoryModalProps {
   onClose: () => void
   projectId: string
   onStoryCreated: () => void
+  editingStory?: Story | null
 }
 
 export default function CreateStoryModal({ 
   isOpen, 
   onClose, 
   projectId, 
-  onStoryCreated 
+  onStoryCreated,
+  editingStory = null
 }: CreateStoryModalProps) {
   const [lockedProjectId, setLockedProjectId] = useState<string>('')
   const { user } = useAuth()
@@ -80,6 +82,8 @@ export default function CreateStoryModal({
   
   const [creating, setCreating] = useState(false)
   const [currentStep, setCurrentStep] = useState<"template" | "form">("template")
+  
+  const isEditing = !!editingStory
 
   // No-op handler to prevent React warnings - we use uncontrolled inputs
   const handleInputChange = useCallback(() => {
@@ -90,11 +94,20 @@ export default function CreateStoryModal({
   useEffect(() => {
     if (isOpen && projectId) {
       setLockedProjectId(projectId)
-      loadTemplates()
+      if (!isEditing) {
+        loadTemplates()
+      } else {
+        // Skip template selection for editing, go straight to form
+        setCurrentStep("form")
+        populateFormForEditing()
+      }
     } else if (!isOpen) {
       setLockedProjectId('')
+      // Reset state when modal closes
+      setCurrentStep("template")
+      setSelectedTemplate(null)
     }
-  }, [isOpen, projectId])
+  }, [isOpen, projectId, isEditing])
 
   const loadTemplates = async () => {
     setLoadingTemplates(true)
@@ -158,6 +171,36 @@ export default function CreateStoryModal({
     setCurrentStep("form")
   }, [])
 
+  // Populate form with existing story data for editing
+  const populateFormForEditing = useCallback(() => {
+    if (!editingStory) return
+
+    // Use setTimeout to ensure refs are available after render
+    setTimeout(() => {
+      if (formRefs.current.title) formRefs.current.title.value = editingStory.title
+      if (formRefs.current.description) formRefs.current.description.value = editingStory.description
+      if (formRefs.current.asA) formRefs.current.asA.value = editingStory.asA || ""
+      if (formRefs.current.iWant) formRefs.current.iWant.value = editingStory.iWant || ""
+      if (formRefs.current.soThat) formRefs.current.soThat.value = editingStory.soThat || ""
+      if (formRefs.current.timeEstimate) formRefs.current.timeEstimate.value = editingStory.timeEstimate || ""
+    }, 0)
+
+    // Populate select data
+    setSelectData({
+      type: editingStory.type,
+      businessValue: editingStory.businessValue,
+      priority: editingStory.priority,
+      riskLevel: editingStory.riskLevel,
+      complexity: editingStory.complexity,
+      storyPoints: editingStory.storyPoints,
+      estimationConfidence: editingStory.estimationConfidence
+    })
+
+    // Populate acceptance criteria and labels
+    setAcceptanceCriteria(editingStory.acceptanceCriteria.map(ac => ac.description))
+    setLabels(editingStory.labels)
+  }, [editingStory])
+
   // Acceptance criteria handlers
   const handleAddAcceptanceCriterion = useCallback(() => {
     setShowCriterionInput(true)
@@ -210,52 +253,81 @@ export default function CreateStoryModal({
 
     setCreating(true)
     try {
-      await createStory({
-        title: formRefs.current.title?.value || "",
-        description: formRefs.current.description?.value || "",
-        type: selectData.type,
-        asA: formRefs.current.asA?.value || "",
-        iWant: formRefs.current.iWant?.value || "",
-        soThat: formRefs.current.soThat?.value || "",
-        businessValue: selectData.businessValue,
-        priority: selectData.priority,
-        riskLevel: selectData.riskLevel,
-        complexity: selectData.complexity,
-        acceptanceCriteria: acceptanceCriteria.map((criteria, index) => ({
-          id: `ac_${index}`,
-          description: criteria,
-          type: "checklist" as const,
-          isCompleted: false,
-          testable: true,
-          priority: "must" as const
-        })),
-        definitionOfDone: [],
-        functionalRequirements: [],
-        nonFunctionalRequirements: [],
-        businessRules: [],
-        storyPoints: selectData.storyPoints,
-        timeEstimate: formRefs.current.timeEstimate?.value || "",
-        estimationConfidence: selectData.estimationConfidence,
-        childStoryIds: [],
-        dependencyIds: [],
-        blockedByIds: [],
-        relatedStoryIds: [],
-        status: "backlog",
-        blockers: [],
-        reportedBy: user.uid,
-        stakeholders: [],
-        labels: labels,
-        components: [],
-        testScenarios: [],
-        attachments: [],
-        mockups: [],
-        wireframes: [],
-        specifications: [],
-        comments: [],
-        reopenedCount: 0,
-        projectId: projectIdToUse,
-        createdFromTemplate: selectedTemplate?.id
-      })
+      if (isEditing && editingStory) {
+        // Update existing story
+        await updateStory(editingStory.id, {
+          title: formRefs.current.title?.value || "",
+          description: formRefs.current.description?.value || "",
+          type: selectData.type,
+          asA: formRefs.current.asA?.value || "",
+          iWant: formRefs.current.iWant?.value || "",
+          soThat: formRefs.current.soThat?.value || "",
+          businessValue: selectData.businessValue,
+          priority: selectData.priority,
+          riskLevel: selectData.riskLevel,
+          complexity: selectData.complexity,
+          acceptanceCriteria: acceptanceCriteria.map((criteria, index) => ({
+            id: `ac_${index}`,
+            description: criteria,
+            type: "checklist" as const,
+            isCompleted: false,
+            testable: true,
+            priority: "must" as const
+          })),
+          storyPoints: selectData.storyPoints,
+          timeEstimate: formRefs.current.timeEstimate?.value || "",
+          estimationConfidence: selectData.estimationConfidence,
+          labels: labels
+        })
+      } else {
+        // Create new story
+        await createStory({
+          title: formRefs.current.title?.value || "",
+          description: formRefs.current.description?.value || "",
+          type: selectData.type,
+          asA: formRefs.current.asA?.value || "",
+          iWant: formRefs.current.iWant?.value || "",
+          soThat: formRefs.current.soThat?.value || "",
+          businessValue: selectData.businessValue,
+          priority: selectData.priority,
+          riskLevel: selectData.riskLevel,
+          complexity: selectData.complexity,
+          acceptanceCriteria: acceptanceCriteria.map((criteria, index) => ({
+            id: `ac_${index}`,
+            description: criteria,
+            type: "checklist" as const,
+            isCompleted: false,
+            testable: true,
+            priority: "must" as const
+          })),
+          definitionOfDone: [],
+          functionalRequirements: [],
+          nonFunctionalRequirements: [],
+          businessRules: [],
+          storyPoints: selectData.storyPoints,
+          timeEstimate: formRefs.current.timeEstimate?.value || "",
+          estimationConfidence: selectData.estimationConfidence,
+          childStoryIds: [],
+          dependencyIds: [],
+          blockedByIds: [],
+          relatedStoryIds: [],
+          status: "backlog",
+          blockers: [],
+          reportedBy: user.uid,
+          stakeholders: [],
+          labels: labels,
+          components: [],
+          testScenarios: [],
+          attachments: [],
+          mockups: [],
+          wireframes: [],
+          specifications: [],
+          comments: [],
+          reopenedCount: 0,
+          projectId: projectIdToUse,
+          createdFromTemplate: selectedTemplate?.id
+        })
+      }
       
       onStoryCreated()
       onClose()
@@ -272,7 +344,7 @@ export default function CreateStoryModal({
       setAcceptanceCriteria([])
       setLabels([])
     } catch (error) {
-      console.error("Error creating story:", error)
+      console.error(`Error ${isEditing ? 'updating' : 'creating'} story:`, error)
     } finally {
       setCreating(false)
     }
@@ -324,12 +396,19 @@ export default function CreateStoryModal({
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                {currentStep === "template" ? "Choose Template" : "Create Story"}
+                {isEditing 
+                  ? "Edit Story" 
+                  : currentStep === "template" 
+                    ? "Choose Template" 
+                    : "Create Story"
+                }
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                {currentStep === "template" 
-                  ? "Select a template or start from scratch"
-                  : selectedTemplate ? `Using: ${selectedTemplate.name}` : "Custom story"
+                {isEditing
+                  ? `Editing: ${editingStory?.title}`
+                  : currentStep === "template" 
+                    ? "Select a template or start from scratch"
+                    : selectedTemplate ? `Using: ${selectedTemplate.name}` : "Custom story"
                 }
               </p>
             </div>
@@ -341,7 +420,7 @@ export default function CreateStoryModal({
 
         {/* Content */}
         <div className="flex-1 overflow-hidden">
-          {currentStep === "template" && (
+          {currentStep === "template" && !isEditing && (
             <div className="h-full flex flex-col">
               {/* Search & Filters */}
               <div className="p-6 border-b bg-gray-50/50 dark:bg-gray-800/50">
@@ -442,20 +521,22 @@ export default function CreateStoryModal({
             </div>
           )}
 
-          {currentStep === "form" && (
+          {(currentStep === "form" || isEditing) && (
             <div className="h-full flex flex-col">
-              {/* Back Navigation */}
-              <div className="px-6 py-3 border-b bg-gray-50/50 dark:bg-gray-800/50">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setCurrentStep("template")}
-                  className="gap-2"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Templates
-                </Button>
-              </div>
+              {/* Back Navigation - only show for creating, not editing */}
+              {!isEditing && (
+                <div className="px-6 py-3 border-b bg-gray-50/50 dark:bg-gray-800/50">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setCurrentStep("template")}
+                    className="gap-2"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to Templates
+                  </Button>
+                </div>
+              )}
 
               <ScrollArea className="h-[60vh] p-6">
                 <div className="max-w-4xl mx-auto space-y-8">
@@ -792,12 +873,12 @@ export default function CreateStoryModal({
                   {creating ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating...
+                      {isEditing ? "Updating..." : "Creating..."}
                     </>
                   ) : (
                     <>
                       <Check className="mr-2 h-4 w-4" />
-                      Create Story
+                      {isEditing ? "Update Story" : "Create Story"}
                     </>
                   )}
                 </Button>
