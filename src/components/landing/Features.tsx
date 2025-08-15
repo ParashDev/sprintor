@@ -1,28 +1,30 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { 
   Zap, 
-  Shield, 
+  FolderOpen, 
   Plus, 
   Star, 
-  FileText, 
-  Smartphone 
+  BarChart3, 
+  Smartphone,
+  Users,
+  History
 } from "lucide-react"
 
 const features = [
   {
-    icon: Zap,
-    title: "Real-time Collaboration",
-    description: "Peer-to-peer connection means instant updates. No lag, no delays - see team votes in real-time."
+    icon: FolderOpen,
+    title: "Project Management",
+    description: "Organize your work into projects with sessions, stories, and team management. Complete project lifecycle tracking."
   },
   {
-    icon: Shield,
-    title: "No Servers Required",
-    description: "Direct browser-to-browser connection. Your data never leaves your network - 100% private and secure."
+    icon: Zap,
+    title: "Real-time Collaboration",
+    description: "Live updates across all participants. See team votes and discussions in real-time with instant synchronization."
   },
   {
     icon: Plus,
     title: "Easy Session Creation",
-    description: "Create rooms instantly. Share a simple room code with your team and start estimating in seconds."
+    description: "Create planning sessions instantly within your projects. Share room codes and start estimating in seconds."
   },
   {
     icon: Star,
@@ -30,14 +32,24 @@ const features = [
     description: "Fibonacci, T-shirt sizes, powers of 2, or custom values. Choose the estimation scale that works for your team."
   },
   {
-    icon: FileText,
-    title: "Export Results",
-    description: "Download your estimation results as CSV or JSON for sprint planning and future reference."
+    icon: BarChart3,
+    title: "Project Analytics",
+    description: "Track team velocity, estimation accuracy, and project progress with detailed insights and reporting."
+  },
+  {
+    icon: Users,
+    title: "Team Management",
+    description: "Invite team members, manage permissions, and create reusable team templates for faster session setup."
+  },
+  {
+    icon: History,
+    title: "Session History",
+    description: "Access all past planning sessions with complete voting history, estimates, and team participation data."
   },
   {
     icon: Smartphone,
-    title: "Mobile Responsive",
-    description: "Perfect experience on desktop, tablet, and mobile. Estimate from anywhere, on any device."
+    title: "Anonymous Participation",
+    description: "Team members can join sessions instantly with just a room code - no account required. Remove barriers to collaboration."
   }
 ]
 
@@ -51,7 +63,7 @@ export function Features() {
           </h2>
         </div>
         
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {features.map((feature, index) => {
             const Icon = feature.icon
             return (

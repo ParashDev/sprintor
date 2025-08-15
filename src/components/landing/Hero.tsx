@@ -30,11 +30,11 @@ export function Hero() {
           <div className="flex flex-col justify-center space-y-8 text-center lg:text-left">
             <div className="space-y-4 sm:space-y-6">
               <h1 className="text-3xl font-bold tracking-tight leading-tight sm:text-4xl sm:tracking-tighter md:text-5xl xl:text-6xl/none">
-                Collaborative Sprint Planning for 
-                <span className="block text-primary mt-1 sm:mt-0 sm:inline"> Agile Teams</span>
+                Plan. Estimate. Deliver.
+                <span className="block text-primary mt-1 sm:mt-0 sm:inline"> Your Agile Project Hub</span>
               </h1>
               <p className="mx-auto lg:mx-0 max-w-[600px] text-muted-foreground text-lg leading-relaxed md:text-xl">
-                Real-time sprint estimation with your distributed team. Sign in to host sessions with advanced features, or join anonymously.
+                Organize your projects, manage planning sessions, and estimate stories with your team. Complete project lifecycle from planning to delivery.
               </p>
             </div>
             

@@ -3,23 +3,23 @@ import { Card, CardContent } from "@/components/ui/card"
 const steps = [
   {
     number: "1",
-    title: "Create or Join Room",
-    description: "Scrum Master creates a room and shares the room code. Team members join using the code."
+    title: "Create Your Projects",
+    description: "Sign in and create projects to organize your work. Define project details, team, and estimation preferences."
   },
   {
     number: "2",
-    title: "Add User Stories",
-    description: "Host adds user stories to be estimated. Stories can be imported or added manually."
+    title: "Launch Planning Sessions",
+    description: "Create planning sessions within your projects. Share room codes with team members for instant participation."
   },
   {
     number: "3",
-    title: "Vote Simultaneously",
-    description: "All team members select their estimates simultaneously. Votes remain hidden until everyone votes."
+    title: "Estimate User Stories",
+    description: "Add stories to sessions and vote simultaneously. Real-time collaboration with multiple estimation decks."
   },
   {
     number: "4",
-    title: "Reveal & Discuss",
-    description: "Votes are revealed together. Team discusses differences and re-votes if needed to reach consensus."
+    title: "Track Progress & Analytics",
+    description: "View session history, team velocity, and project insights. Export data and manage your project lifecycle."
   }
 ]
 
