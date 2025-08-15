@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,7 +20,7 @@ const DECK_OPTIONS = [
   { value: 'custom', label: 'Custom Cards', description: 'Define your own estimation values' }
 ]
 
-export default function CreateSessionPage() {
+function CreateSessionContent() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -335,5 +335,17 @@ export default function CreateSessionPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function CreateSessionPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <CreateSessionContent />
+    </Suspense>
   )
 }
