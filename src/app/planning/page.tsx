@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { getSessionsByHost, getSessionStats, getSessionsByProject, getProjectSessionStats } from "@/lib/session-service"
@@ -44,7 +44,7 @@ interface Project {
   companyName: string
 }
 
-export default function PlanningPage() {
+function PlanningContent() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -845,5 +845,17 @@ export default function PlanningPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function PlanningPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <PlanningContent />
+    </Suspense>
   )
 }
