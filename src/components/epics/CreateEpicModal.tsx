@@ -10,7 +10,6 @@ import {
   X,
   Check,
   Loader2,
-  Calendar,
   Plus,
   Trash2,
   Rocket,
@@ -304,7 +303,7 @@ export function CreateEpicModal({
                   ))}
                   {acceptanceCriteria.length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-4">
-                      No acceptance criteria defined. Click "Add Criteria" to add requirements.
+                      No acceptance criteria defined. Click &quot;Add Criteria&quot; to add requirements.
                     </p>
                   )}
                 </div>
