@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { deleteEpic, updateEpic, subscribeToProjectEpics } from "@/lib/epic-service"
@@ -75,7 +75,7 @@ interface ProjectWithCount extends Project {
   companyName: string
 }
 
-export default function EpicsPage() {
+function EpicsPageContent() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -662,5 +662,15 @@ export default function EpicsPage() {
         )}
       </main>
     </div>
+  )
+}
+
+export default function EpicsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>}>
+      <EpicsPageContent />
+    </Suspense>
   )
 }
