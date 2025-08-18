@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useAuth } from "@/contexts/AuthContext"
 import { createStory, updateStory, getStoryTemplates } from "@/lib/story-service"
+import { getEpicsByProject } from "@/lib/epic-service"
 import type { StoryTemplate, Story } from "@/types/story"
+import type { Epic } from "@/types/epic"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -24,8 +26,44 @@ import {
   Loader2,
   X,
   Check,
-  ArrowLeft
+  ArrowLeft,
+  Rocket,
+  Wrench,
+  Lightbulb,
+  Shield,
+  BarChart3,
+  Palette,
+  Settings,
+  Smartphone,
+  Star,
+  Building2,
+  Lock
 } from "lucide-react"
+
+// Icon component map for rendering epic icons
+const IconMap = {
+  Rocket,
+  Zap,
+  Target,
+  Wrench,
+  Lightbulb,
+  Shield,
+  BarChart3,
+  Palette,
+  Search,
+  Settings,
+  Smartphone,
+  Star,
+  Building2,
+  Lock,
+  FileText
+}
+
+// Helper function to render icon
+const renderEpicIcon = (iconName: string, className: string = "h-4 w-4") => {
+  const IconComponent = IconMap[iconName as keyof typeof IconMap]
+  return IconComponent ? <IconComponent className={className} /> : <FileText className={className} />
+}
 
 interface CreateStoryModalProps {
   isOpen: boolean
@@ -33,6 +71,7 @@ interface CreateStoryModalProps {
   projectId: string
   onStoryCreated: () => void
   editingStory?: Story | null
+  defaultEpicId?: string
 }
 
 export default function CreateStoryModal({ 
@@ -40,7 +79,8 @@ export default function CreateStoryModal({
   onClose, 
   projectId, 
   onStoryCreated,
-  editingStory = null
+  editingStory = null,
+  defaultEpicId
 }: CreateStoryModalProps) {
   const [lockedProjectId, setLockedProjectId] = useState<string>('')
   const { user } = useAuth()
@@ -51,6 +91,11 @@ export default function CreateStoryModal({
   const [templateSearch, setTemplateSearch] = useState("")
   const [templateCategory, setTemplateCategory] = useState<string>("all")
   const [loadingTemplates, setLoadingTemplates] = useState(true)
+  
+  // Epic state
+  const [epics, setEpics] = useState<Epic[]>([])
+  const [selectedEpicId, setSelectedEpicId] = useState<string>("no-epic")
+  const [loadingEpics, setLoadingEpics] = useState(false)
   
   // Form refs for uncontrolled inputs
   const formRefs = useRef({
@@ -64,7 +109,7 @@ export default function CreateStoryModal({
   
   // Controlled selects
   const [selectData, setSelectData] = useState({
-    type: "story" as "story" | "epic" | "task" | "bug" | "spike",
+    type: "story" as "story" | "task" | "bug" | "spike",
     businessValue: 5,
     priority: "Should Have" as "Must Have" | "Should Have" | "Could Have" | "Won't Have",
     riskLevel: "Medium" as "Low" | "Medium" | "High" | "Critical",
@@ -94,6 +139,16 @@ export default function CreateStoryModal({
   useEffect(() => {
     if (isOpen && projectId) {
       setLockedProjectId(projectId)
+      
+      // Set the selected epic immediately if defaultEpicId is provided
+      if (!isEditing && defaultEpicId) {
+        setSelectedEpicId(defaultEpicId)
+      } else {
+        setSelectedEpicId("no-epic")
+      }
+      
+      // Load epics for project
+      loadEpics()
       if (!isEditing) {
         loadTemplates()
       } else {
@@ -106,8 +161,10 @@ export default function CreateStoryModal({
       // Reset state when modal closes
       setCurrentStep("template")
       setSelectedTemplate(null)
+      setSelectedEpicId("no-epic")
+      setEpics([])
     }
-  }, [isOpen, projectId, isEditing])
+  }, [isOpen, projectId, isEditing, defaultEpicId])
 
   const loadTemplates = async () => {
     setLoadingTemplates(true)
@@ -122,9 +179,25 @@ export default function CreateStoryModal({
     }
   }
 
-  // Filter templates
+  const loadEpics = async () => {
+    setLoadingEpics(true)
+    try {
+      const projectIdToUse = lockedProjectId || projectId
+      const projectEpics = await getEpicsByProject(projectIdToUse)
+      setEpics(projectEpics)
+    } catch (error) {
+      console.error('Error loading epics:', error)
+    } finally {
+      setLoadingEpics(false)
+    }
+  }
+
+  // Filter templates - exclude epic templates since we have dedicated epic management
   const filteredTemplates = useMemo(() => {
     return templates.filter(template => {
+      // Exclude epic templates entirely
+      if (template.category === 'epic') return false
+      
       const matchesSearch = !templateSearch || 
         template.name.toLowerCase().includes(templateSearch.toLowerCase()) ||
         template.description.toLowerCase().includes(templateSearch.toLowerCase())
@@ -151,10 +224,10 @@ export default function CreateStoryModal({
       if (formRefs.current.timeEstimate) formRefs.current.timeEstimate.value = template.defaultTimeEstimate || ""
     }, 0)
     
-    // Update selects
+    // Update selects (epic templates are excluded, so always set type to 'story')
     setSelectData(prev => ({
       ...prev,
-      type: template.category === 'epic' ? 'epic' : 'story',
+      type: 'story',
       businessValue: template.defaultBusinessValue,
       priority: template.defaultPriority,
       riskLevel: template.riskLevel,
@@ -186,6 +259,7 @@ export default function CreateStoryModal({
     }, 0)
 
     // Populate select data
+    setSelectedEpicId(editingStory.epicId || "no-epic")
     setSelectData({
       type: editingStory.type,
       businessValue: editingStory.businessValue,
@@ -277,6 +351,7 @@ export default function CreateStoryModal({
           storyPoints: selectData.storyPoints,
           timeEstimate: formRefs.current.timeEstimate?.value || "",
           estimationConfidence: selectData.estimationConfidence,
+          epicId: selectedEpicId && selectedEpicId !== "no-epic" ? selectedEpicId : undefined,
           labels: labels
         })
       } else {
@@ -325,6 +400,7 @@ export default function CreateStoryModal({
           comments: [],
           reopenedCount: 0,
           projectId: projectIdToUse,
+          epicId: selectedEpicId && selectedEpicId !== "no-epic" ? selectedEpicId : undefined,
           createdFromTemplate: selectedTemplate?.id
         })
       }
@@ -444,20 +520,57 @@ export default function CreateStoryModal({
                       <SelectItem value="bug">Bug</SelectItem>
                       <SelectItem value="technical">Technical</SelectItem>
                       <SelectItem value="research">Research</SelectItem>
-                      <SelectItem value="epic">Epic</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 
-                <div className="mt-4">
-                  <Button 
-                    onClick={handleStartFromScratch} 
-                    variant="outline" 
-                    className="w-full sm:w-auto"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Start from Scratch
-                  </Button>
+                <div className="mt-4 flex flex-col sm:flex-row gap-4 items-start">
+                  {/* Epic Assignment Display */}
+                  <div className="w-full sm:flex-1">
+                    <Label className="text-sm font-medium">Epic for this Story</Label>
+                    <div className="mt-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-input">
+                      {loadingEpics ? (
+                        <span className="text-sm text-muted-foreground">Loading epics...</span>
+                      ) : selectedEpicId === "no-epic" ? (
+                        <span className="text-sm text-muted-foreground">No Epic - Story will be unassigned</span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            const selectedEpic = epics.find(epic => epic.id === selectedEpicId)
+                            if (!selectedEpic) {
+                              return <span className="text-sm text-muted-foreground">No Epic - Story will be unassigned</span>
+                            }
+                            return (
+                              <>
+                                <div 
+                                  className="w-4 h-4 rounded-sm flex items-center justify-center"
+                                  style={{ backgroundColor: selectedEpic.color + '20', color: selectedEpic.color }}
+                                >
+                                  {selectedEpic.icon ? renderEpicIcon(selectedEpic.icon, "h-3 w-3") : <FileText className="h-3 w-3" />}
+                                </div>
+                                <span className="text-sm font-medium">{selectedEpic.name}</span>
+                                <span className="text-xs text-muted-foreground ml-auto">Auto-assigned</span>
+                              </>
+                            )
+                          })()} 
+                        </div>
+                      )}
+                    </div>
+                    {!loadingEpics && selectedEpicId !== "no-epic" && epics.find(epic => epic.id === selectedEpicId) && (
+                      <p className="text-xs text-muted-foreground mt-1">Story will be automatically assigned to this epic</p>
+                    )}
+                  </div>
+                  
+                  <div className="w-full sm:w-auto mt-4 sm:mt-6">
+                    <Button 
+                      onClick={handleStartFromScratch} 
+                      variant="outline" 
+                      className="w-full sm:w-auto"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Start from Scratch
+                    </Button>
+                  </div>
                 </div>
               </div>
 
@@ -578,12 +691,38 @@ export default function CreateStoryModal({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="story">Story</SelectItem>
-                            <SelectItem value="epic">Epic</SelectItem>
                             <SelectItem value="task">Task</SelectItem>
                             <SelectItem value="bug">Bug</SelectItem>
                             <SelectItem value="spike">Spike</SelectItem>
                           </SelectContent>
                         </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="selected-epic">Selected Epic</Label>
+                        <div className="mt-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-input">
+                          {selectedEpicId === "no-epic" ? (
+                            <span className="text-sm text-muted-foreground">No Epic Selected</span>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              {(() => {
+                                const selectedEpic = epics.find(epic => epic.id === selectedEpicId)
+                                if (!selectedEpic) return <span className="text-sm text-muted-foreground">No Epic Selected</span>
+                                return (
+                                  <>
+                                    <div 
+                                      className="w-4 h-4 rounded-sm flex items-center justify-center"
+                                      style={{ backgroundColor: selectedEpic.color + '20', color: selectedEpic.color }}
+                                    >
+                                      {selectedEpic.icon ? renderEpicIcon(selectedEpic.icon, "h-3 w-3") : <FileText className="h-3 w-3" />}
+                                    </div>
+                                    <span className="text-sm font-medium">{selectedEpic.name}</span>
+                                  </>
+                                )
+                              })()} 
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Epic was selected during template selection</p>
                       </div>
                       <div>
                         <Label htmlFor="priority">Priority</Label>

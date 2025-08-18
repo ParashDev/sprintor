@@ -137,6 +137,17 @@ export async function incrementTemplateUsage(templateId: string): Promise<void> 
 // === STORIES ===
 
 // Create a new story
+// Helper function to clean undefined values from objects before Firestore write
+function cleanStoryDataForFirestore(data: any): Record<string, any> {
+  const cleanData: Record<string, any> = {}
+  Object.entries(data).forEach(([key, value]) => {
+    if (value !== undefined) {
+      cleanData[key] = value
+    }
+  })
+  return cleanData
+}
+
 export async function createStory(storyData: Omit<Story, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
   try {
     const storyId = `story_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -146,12 +157,15 @@ export async function createStory(storyData: Omit<Story, 'id' | 'createdAt' | 'u
       await incrementTemplateUsage(storyData.createdFromTemplate)
     }
     
-    await setDoc(doc(db, 'stories', storyId), {
+    // Clean undefined values before writing to Firestore
+    const cleanData = cleanStoryDataForFirestore({
       id: storyId,
       ...storyData,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     })
+    
+    await setDoc(doc(db, 'stories', storyId), cleanData)
 
     return storyId
   } catch (error) {
@@ -237,10 +251,14 @@ export async function getStory(storyId: string): Promise<Story | null> {
 export async function updateStory(storyId: string, updates: Partial<Omit<Story, 'id' | 'createdAt'>>): Promise<void> {
   try {
     const storyRef = doc(db, 'stories', storyId)
-    await updateDoc(storyRef, {
+    
+    // Clean undefined values before writing to Firestore
+    const cleanUpdates = cleanStoryDataForFirestore({
       ...updates,
       updatedAt: serverTimestamp()
     })
+    
+    await updateDoc(storyRef, cleanUpdates)
   } catch (error) {
     console.error('Error updating story:', error)
     throw new Error('Failed to update story')

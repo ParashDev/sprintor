@@ -64,7 +64,7 @@ export interface Story {
   id: string
   title: string
   description: string
-  type: 'epic' | 'story' | 'task' | 'bug' | 'spike'
+  type: 'story' | 'task' | 'bug' | 'spike'
   
   // User Story Format
   asA?: string

@@ -58,6 +58,12 @@ npm run lint            # Run ESLint checks (required to pass before deployment)
 - ✅ **Template Categories**: Organized by feature, bug, technical, research, epic types
 - ✅ **Rich Story Data**: User story format, acceptance criteria, business value, risk levels
 - ✅ **Performance Optimized**: CreateStoryModal uses uncontrolled inputs for lag-free typing
+- ✅ **Kanban Board**: Full drag-and-drop story management with mobile touch support
+- ✅ **Story Workflow**: Backlog → Ready → In Progress → Review → Testing → Done columns
+- ✅ **Edit/Delete Stories**: Comprehensive story management with confirmation dialogs
+- ✅ **Mobile Responsive**: Touch-optimized drag and drop with proper mobile sensors
+- ✅ **Search & Filtering**: Real-time story search with instant results
+- ✅ **Story Statistics**: Live stats cards showing project progress and completion rates
 
 ### Core Session Management
 - ✅ **Session Creation**: Hosts can create sessions with custom names, descriptions, and estimation decks
@@ -300,11 +306,88 @@ projects/{projectId} = {
 }
 ```
 
+### Stories Collection (NEW)
+```
+stories/{storyId} = {
+  id: string
+  title: string
+  description: string
+  type: 'story' | 'epic' | 'task' | 'bug' | 'spike'
+  status: 'backlog' | 'ready' | 'in_progress' | 'review' | 'testing' | 'done'
+  priority: 'Must Have' | 'Should Have' | 'Could Have' | 'Won\'t Have'
+  businessValue: number (1-10)
+  riskLevel: 'Low' | 'Medium' | 'High' | 'Critical'
+  complexity: 'Simple' | 'Moderate' | 'Complex' | 'Epic'
+  storyPoints?: number
+  timeEstimate?: string
+  estimationConfidence: 'Low' | 'Medium' | 'High'
+  acceptanceCriteria: Array<{
+    id: string
+    description: string
+    type: 'checklist'
+    isCompleted: boolean
+    testable: boolean
+    priority: 'must' | 'should' | 'could'
+  }>
+  labels: string[]
+  projectId: string
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  reportedBy: string
+  
+  // 🎯 NEW: Planning Session Integration Fields (TO BE IMPLEMENTED)
+  isEstimated: boolean                    // Has this story been estimated in planning?
+  estimatedInSession?: string             // Session ID where it was estimated
+  estimationDate?: Timestamp              // When estimation was completed
+  votingHistory?: Array<{                 // Estimation voting history from sessions
+    sessionId: string
+    votes: Record<string, string>
+    participantNames: Record<string, string>
+    timestamp: Timestamp
+    finalEstimate?: string
+  }>
+}
+```
+
+### Story Templates Collection (NEW)
+```
+storyTemplates/{templateId} = {
+  id: string
+  name: string
+  description: string
+  category: 'feature' | 'bug' | 'technical' | 'research' | 'epic'
+  asA: string
+  iWant: string
+  soThat: string
+  defaultAcceptanceCriteria: string[]
+  defaultBusinessValue: number
+  defaultPriority: string
+  riskLevel: string
+  complexity: string
+  suggestedStoryPoints?: number[]
+  suggestedLabels: string[]
+  defaultTimeEstimate?: string
+  isDefault: boolean
+  projectId?: string                      // null for global templates
+  createdAt: Timestamp
+  usageCount: number
+  lastUsed?: Timestamp
+}
+```
+
 ### Required Firestore Indexes
 ```
 Collection: sessions
 Composite Index: hostId (Ascending), projectId (Ascending), createdAt (Descending)
 Purpose: Enable project-scoped session queries
+
+Collection: stories
+Composite Index: projectId (Ascending), isEstimated (Ascending), updatedAt (Descending)
+Purpose: Enable story filtering by estimation status
+
+Collection: storyTemplates
+Composite Index: projectId (Ascending), category (Ascending), name (Ascending)
+Purpose: Enable template filtering and searching
 ```
 
 ## Critical Implementation Details
@@ -454,6 +537,25 @@ getProjectSessionStats(hostId, projectId) → Promise<Stats>      // Project-spe
 getSessionStats(hostId) → Promise<Stats>                        // Global user stats (legacy)
 ```
 
+### Story Service Extensions (story-service.ts)
+```typescript
+createStory(storyData) → Promise<string>                      // Create new story
+getStoriesByProject(projectId, options?) → Promise<Story[]>   // Get project stories with filtering
+getStory(storyId) → Promise<Story|null>                       // Get single story
+updateStory(storyId, updates) → Promise<void>                 // Update story
+deleteStory(storyId) → Promise<void>                          // Delete story
+subscribeToProjectStories(projectId, callback) → Function     // Real-time story updates
+getProjectStoryStats(projectId) → Promise<StoryStats>         // Story statistics
+createStoryTemplate(templateData) → Promise<string>           // Create story template
+getStoryTemplates(projectId?) → Promise<StoryTemplate[]>      // Get available templates
+
+// 🎯 TO BE IMPLEMENTED: Planning Session Integration
+getUnestimatedStories(projectId) → Promise<Story[]>           // Get stories ready for estimation
+importStoriesToSession(sessionId, storyIds[]) → Promise<void> // Import stories to planning session
+syncEstimationResults(sessionId, storyResults[]) → Promise<void> // Sync results back to stories
+markStoryEstimated(storyId, sessionId, estimate) → Promise<void> // Mark story as estimated
+```
+
 ## Current Architecture Status: COMPLETED ✅
 
 ### ✅ Implemented Features
@@ -465,9 +567,28 @@ getSessionStats(hostId) → Promise<Stats>                        // Global user
 - **Performance Optimized**: Input lag resolved, React state optimized
 - **Smart Reconnection**: Time-based logic prevents false reconnect prompts
 
-### Next Implementation Phase: Advanced Features
+### Next Implementation Phase: Story-Session Integration 🎯
 
-#### Planned Enhancements
+#### 🔥 CRITICAL: Story-Planning Session Integration (Priority 1)
+**Current Issue**: Stories created in Stories page and planning session stories are completely disconnected
+
+**Required Implementation**:
+1. **Story Import to Sessions**: Allow importing pre-created stories from Stories page into planning sessions
+2. **Backlog Selection Interface**: Add story selection UI when creating/starting planning sessions
+3. **Estimation Sync**: Sync voting results from planning sessions back to Stories collection
+4. **Status Integration**: Show estimation status (estimated/not estimated) in Stories Kanban board
+5. **Workflow Integration**: Complete the proper agile workflow: Stories Page (prepare) → Planning Session (vote) → Results sync back
+
+**Expected Workflow**:
+```
+1. Team prepares backlog in Stories page (create stories, set priorities, acceptance criteria)
+2. Planning meeting: Host selects stories from backlog to estimate
+3. Team votes on imported stories during planning session
+4. Estimation results automatically sync back to Stories collection
+5. Stories Kanban board shows estimation status and results
+```
+
+#### Additional Planned Enhancements
 - **Session Templates**: Pre-configured session setups with story libraries
 - **Team Management**: Invite team members, manage permissions
 - **Advanced Analytics**: Sprint velocity, estimation accuracy tracking
@@ -640,10 +761,15 @@ Sprintor is now a **complete, production-ready planning poker application** with
 
 ✅ **Core Functionality**: Real-time planning poker sessions with voting, estimation, and history
 ✅ **Project Management**: Complete project lifecycle with Firebase integration
+✅ **Story Management**: Full Kanban board with drag-and-drop, mobile touch support
 ✅ **Authentication**: Firebase Auth for hosts, anonymous access for participants
-✅ **Performance Optimized**: Resolved input lag, optimized React rendering
+✅ **Performance Optimized**: Resolved input lag, optimized React rendering, mobile drag performance
 ✅ **User Experience**: Smart reconnection, project-scoped views, responsive design
 
 The architecture successfully supports the **project → sessions → stories** hierarchy with real-time updates, project-specific metrics, and seamless user experience. All code follows TypeScript best practices and is production-ready for Vercel/Railway deployment.
+
+**The next major development phase is integrating the Stories page with planning sessions to create a proper agile workflow where teams prepare backlogs first, then conduct estimation sessions on those prepared stories.**
+
+This will transform Sprintor from a standalone planning poker tool into a complete agile story management system!
 
 **Ready for production deployment and user testing!** 🚀

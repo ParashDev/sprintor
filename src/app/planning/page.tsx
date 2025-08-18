@@ -259,12 +259,12 @@ function PlanningContent() {
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-              <h1 className="text-3xl font-bold">Planning Sessions</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold">Planning Sessions</h1>
               <p className="text-muted-foreground mt-1">Manage estimation sessions for your projects</p>
             </div>
-            <Button asChild size="lg" disabled={!selectedProject}>
+            <Button size="lg" disabled={!selectedProject} asChild>
               <Link href={selectedProject ? `/create?project=${selectedProject.id}` : "/create"}>
                 <Plus className="mr-2 h-5 w-5" />
                 New Session
@@ -273,25 +273,28 @@ function PlanningContent() {
           </div>
           
           {/* Project Selector */}
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-medium">Project:</label>
-            <div className="min-w-[200px]">
-              <Select value={selectedProjectId} onValueChange={handleProjectChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select project..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      <div className="flex items-center gap-2">
-                        <span>{project.name}</span>
-                        <span className="text-xs text-muted-foreground">• {project.companyName}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium whitespace-nowrap">Project:</label>
+              <div className="min-w-[200px]">
+                <Select value={selectedProjectId} onValueChange={handleProjectChange}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select project..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{project.name}</span>
+                          <span className="text-xs text-muted-foreground">• {project.companyName}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+            
             {!selectedProject && projects.length === 0 && (
               <Button asChild>
                 <Link href="/projects">

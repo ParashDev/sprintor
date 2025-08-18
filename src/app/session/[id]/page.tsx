@@ -321,11 +321,21 @@ export default function SessionPage() {
     
     try {
       await deleteStory(sessionId, storyToDelete.id)
+      // Ensure UI state is reset properly
       setShowDeleteDialog(false)
       setStoryToDelete(null)
     } catch (error) {
       console.error('Error deleting story:', error)
+      // Reset UI state even on error
+      setShowDeleteDialog(false)
+      setStoryToDelete(null)
     }
+    
+    // Safety timeout to ensure state is always reset
+    setTimeout(() => {
+      setShowDeleteDialog(false)
+      setStoryToDelete(null)
+    }, 100)
   }
 
   if (loading) {
