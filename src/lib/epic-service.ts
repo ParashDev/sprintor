@@ -11,8 +11,7 @@ import {
   collection,
   where,
   orderBy,
-  getDocs,
-  writeBatch
+  getDocs
 } from 'firebase/firestore'
 import { db } from './firebase'
 import type { Epic, EpicStats } from '@/types/epic'
@@ -133,7 +132,7 @@ export async function updateEpic(epicId: string, updates: Partial<Omit<Epic, 'id
     const epicRef = doc(db, 'epics', epicId)
     
     // Filter out undefined values
-    const cleanUpdates: Record<string, any> = {}
+    const cleanUpdates: Record<string, unknown> = {}
     Object.entries(updates).forEach(([key, value]) => {
       if (value !== undefined) {
         cleanUpdates[key] = value

@@ -138,8 +138,8 @@ export async function incrementTemplateUsage(templateId: string): Promise<void> 
 
 // Create a new story
 // Helper function to clean undefined values from objects before Firestore write
-function cleanStoryDataForFirestore(data: any): Record<string, any> {
-  const cleanData: Record<string, any> = {}
+function cleanStoryDataForFirestore(data: Record<string, unknown>): Record<string, unknown> {
+  const cleanData: Record<string, unknown> = {}
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined) {
       cleanData[key] = value
