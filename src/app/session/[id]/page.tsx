@@ -26,7 +26,7 @@ import {
   Edit3,
   Trash2
 } from "lucide-react"
-import { subscribeToSession, addStory, editStory, deleteStory, startVoting, castVote, revealVotes, endVoting, updateParticipantHeartbeat, cleanupInactiveParticipants, joinSession } from "@/lib/session-service"
+import { subscribeToSession, addStory, deleteStory, startVoting, castVote, revealVotes, endVoting, updateParticipantHeartbeat, cleanupInactiveParticipants, joinSession } from "@/lib/session-service"
 import { getStoriesByProject, subscribeToProjectStories, updateStory } from "@/lib/story-service"
 import { SessionHeader } from "@/components/session/SessionHeader"
 import { SessionReconnectModal } from "@/components/session/SessionReconnectModal"

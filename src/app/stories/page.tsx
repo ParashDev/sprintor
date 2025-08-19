@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { getStoriesByProject, getProjectStoryStats, updateStory, deleteStory, subscribeToProjectStories } from "@/lib/story-service"
 import { getProjectsByOwner } from "@/lib/project-service"
-import { getEpicsByProject, subscribeToProjectEpics } from "@/lib/epic-service"
+import { subscribeToProjectEpics } from "@/lib/epic-service"
 import type { Story } from "@/types/story"
 import type { Epic } from "@/types/epic"
 import { Button } from "@/components/ui/button"
@@ -115,8 +115,8 @@ const KANBAN_COLUMNS = [
 const StoryCardContent = React.memo(function StoryCardContent({ 
   story, 
   onEdit, 
-  onDelete, 
-  isDeleting 
+  onDelete,
+  isDeleting
 }: {
   story: Story
   onEdit: (story: Story) => void
@@ -235,8 +235,8 @@ const StoryCard = function StoryCard({ story, onEdit, onDelete, isDeleting }: St
       <StoryCardContent 
         story={story} 
         onEdit={onEdit} 
-        onDelete={onDelete} 
-        isDeleting={isDeleting} 
+        onDelete={onDelete}
+        isDeleting={isDeleting}
       />
     </div>
   )
@@ -617,7 +617,6 @@ function StoriesContent() {
     
     // Immediate cleanup
     setActiveStory(null)
-    setIsDraggedOver(null)
 
     if (!over || !user) return
 
@@ -1148,8 +1147,8 @@ function StoriesContent() {
                   <StoryCardContent 
                     story={activeStory} 
                     onEdit={() => {}} 
-                    onDelete={() => {}} 
-                    isDeleting={false} 
+                    onDelete={() => {}}
+                    isDeleting={false}
                   />
                 </div>
               ) : null}
