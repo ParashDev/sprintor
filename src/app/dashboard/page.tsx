@@ -3,139 +3,342 @@
 import React, { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
-import { getSessionsByHost, getSessionStats } from "@/lib/session-service"
-import type { Session } from "@/types/session"
-import { Button } from "@/components/ui/button"
+import { getProjectsByOwner } from "@/lib/project-service"
+import { getEpicsByProject } from "@/lib/epic-service"
+import { getStoriesByProject, getProjectStoryStats } from "@/lib/story-service"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { 
-  Plus, 
-  Users, 
-  Loader2,
-  FileText,
-  Calendar,
+  BarChart3,
+  Target,
   TrendingUp,
   Clock,
-  Target,
-  BarChart3,
+  CheckCircle2,
   Activity,
-  Zap,
-  Award,
-  Gauge
+  Users,
+  Rocket,
+  FileText,
+  Calendar,
+  Loader2,
+  Plus,
+  Building2,
+  BookOpen,
+  AlertCircle
 } from "lucide-react"
 import Link from "next/link"
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader"
 
+// Helper function to get relative time
+function getRelativeTime(date: Date): string {
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / (1000 * 60))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins} min ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  return date.toLocaleDateString()
+}
+
+// Helper function to get status color
+function getStatusColor(status: string): string {
+  switch (status) {
+    case 'backlog': return 'text-gray-600 dark:text-gray-400'
+    case 'planning': return 'text-blue-600 dark:text-blue-400'
+    case 'sprint_ready': return 'text-green-600 dark:text-green-400'
+    default: return 'text-gray-600 dark:text-gray-400'
+  }
+}
+
+// Helper function to get status label
+function getStatusLabel(status: string): string {
+  switch (status) {
+    case 'backlog': return 'Backlog'
+    case 'planning': return 'Planning'
+    case 'sprint_ready': return 'Sprint Ready'
+    default: return status
+  }
+}
+
+// Helper function to format days remaining
+function formatDaysRemaining(days: number, isOverdue: boolean): { text: string; color: string } {
+  if (isOverdue) {
+    const overdueDays = Math.abs(days)
+    return {
+      text: overdueDays === 1 ? '1 day overdue' : `${overdueDays} days overdue`,
+      color: 'text-red-600 dark:text-red-400'
+    }
+  } else if (days === 0) {
+    return {
+      text: 'Due today',
+      color: 'text-orange-600 dark:text-orange-400'
+    }
+  } else if (days === 1) {
+    return {
+      text: '1 day left',
+      color: 'text-orange-600 dark:text-orange-400'
+    }
+  } else if (days <= 7) {
+    return {
+      text: `${days} days left`,
+      color: 'text-yellow-600 dark:text-yellow-400'
+    }
+  } else {
+    return {
+      text: `${days} days left`,
+      color: 'text-green-600 dark:text-green-400'
+    }
+  }
+}
+
+interface DashboardProject {
+  id: string
+  name: string
+  description: string
+  companyName: string
+  epicsCount: number
+  storiesCount: number
+  storiesInPlanning: number
+  storiesSprintReady: number
+  completionRate: number
+  lastActivity: Date
+}
+
+interface EpicWithDeadline {
+  id: string
+  name: string
+  projectName: string
+  targetDate: Date
+  status: 'planning' | 'active' | 'completed'
+  color: string
+  daysRemaining: number
+  isOverdue: boolean
+}
+
+interface ProjectStats {
+  totalProjects: number
+  activeProjects: number
+  totalEpics: number
+  activeEpics: number
+  totalStories: number
+  storiesInPlanning: number
+  storiesSprintReady: number
+  overallVelocity: number
+  sprintReadiness: number
+}
+
+interface RecentStory {
+  id: string
+  title: string
+  status: 'backlog' | 'planning' | 'sprint_ready'
+  updatedAt: Date
+  projectName: string
+  epicId?: string
+}
+
 export default function DashboardPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [sessions, setSessions] = useState<Session[]>([])
-  const [stats, setStats] = useState({
-    totalSessions: 0,
-    storiesEstimated: 0,
-    teamMembers: 0,
-    avgEstimationTime: '--'
+  
+  // State
+  const [projects, setProjects] = useState<DashboardProject[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('all')
+  const [stats, setStats] = useState<ProjectStats>({
+    totalProjects: 0,
+    activeProjects: 0,
+    totalEpics: 0,
+    activeEpics: 0,
+    totalStories: 0,
+    storiesInPlanning: 0,
+    storiesSprintReady: 0,
+    overallVelocity: 0,
+    sprintReadiness: 0
   })
-  const [loadingStats, setLoadingStats] = useState(true)
+  const [recentStories, setRecentStories] = useState<RecentStory[]>([])
+  const [epicsWithDeadlines, setEpicsWithDeadlines] = useState<EpicWithDeadline[]>([])
+  const [loadingData, setLoadingData] = useState(true)
 
   useEffect(() => {
-    // Redirect to login if not authenticated
     if (!loading && !user) {
       router.push('/auth/login')
     }
   }, [user, loading, router])
 
   useEffect(() => {
-    // Fetch analytics data when user is available
     if (user && !loading) {
-      fetchAnalyticsData()
+      fetchDashboardData()
     }
   }, [user, loading])
 
-  const fetchAnalyticsData = async () => {
+  const fetchDashboardData = async () => {
     if (!user) return
     
-    setLoadingStats(true)
+    setLoadingData(true)
     try {
-      const [userSessions, userStats] = await Promise.all([
-        getSessionsByHost(user.uid),
-        getSessionStats(user.uid)
-      ])
+      const userProjects = await getProjectsByOwner(user.uid)
+      const dashboardProjects: DashboardProject[] = []
+      const allRecentStories: RecentStory[] = []
+      const allEpicsWithDeadlines: EpicWithDeadline[] = []
       
-      setSessions(userSessions)
-      setStats(userStats)
+      let totalEpics = 0
+      let activeEpics = 0
+      let totalStories = 0
+      let totalStoriesInPlanning = 0
+      let totalStoriesSprintReady = 0
+
+      for (const project of userProjects) {
+        // Get epics for this project
+        const epics = await getEpicsByProject(project.id)
+        const activeEpicsCount = epics.filter(e => e.status === 'active').length
+        
+        // Collect epics with target dates
+        epics.forEach(epic => {
+          if (epic.targetDate) {
+            const today = new Date()
+            today.setHours(0, 0, 0, 0)
+            const targetDate = new Date(epic.targetDate)
+            targetDate.setHours(0, 0, 0, 0)
+            const diffTime = targetDate.getTime() - today.getTime()
+            const daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+            
+            allEpicsWithDeadlines.push({
+              id: epic.id,
+              name: epic.name,
+              projectName: project.name,
+              targetDate: epic.targetDate,
+              status: epic.status,
+              color: epic.color,
+              daysRemaining,
+              isOverdue: daysRemaining < 0
+            })
+          }
+        })
+        
+        // Get story stats for this project
+        const storyStats = await getProjectStoryStats(project.id)
+        const storiesInPlanning = storyStats.storiesByStatus?.planning || 0
+        const storiesSprintReady = storyStats.storiesByStatus?.sprint_ready || 0
+        
+        // Get recent stories for this project (last 10, we'll trim later)
+        const projectStories = await getStoriesByProject(project.id, { limitCount: 10 })
+        const recentProjectStories = projectStories.map(story => ({
+          id: story.id,
+          title: story.title,
+          status: story.status,
+          updatedAt: story.updatedAt,
+          projectName: project.name,
+          epicId: story.epicId
+        }))
+        allRecentStories.push(...recentProjectStories)
+        
+        totalEpics += epics.length
+        activeEpics += activeEpicsCount
+        totalStories += storyStats.totalStories
+        totalStoriesInPlanning += storiesInPlanning
+        totalStoriesSprintReady += storiesSprintReady
+
+        dashboardProjects.push({
+          id: project.id,
+          name: project.name,
+          description: project.description,
+          companyName: project.companyName,
+          epicsCount: epics.length,
+          storiesCount: storyStats.totalStories,
+          storiesInPlanning,
+          storiesSprintReady,
+          completionRate: storyStats.completionRate,
+          lastActivity: project.updatedAt
+        })
+      }
+
+      // Sort all stories by updatedAt and take the most recent 7
+      const sortedRecentStories = allRecentStories
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .slice(0, 7)
+
+      // Sort epics by urgency (overdue first, then by days remaining)
+      const sortedEpicsWithDeadlines = allEpicsWithDeadlines
+        .sort((a, b) => {
+          // Overdue epics first
+          if (a.isOverdue && !b.isOverdue) return -1
+          if (!a.isOverdue && b.isOverdue) return 1
+          // Then by days remaining (most urgent first)
+          return a.daysRemaining - b.daysRemaining
+        })
+        .slice(0, 6) // Show top 6 most urgent
+
+      // Calculate overall stats
+      const overallVelocity = Math.round((totalStoriesSprintReady / Math.max(totalStories, 1)) * 100)
+      const sprintReadiness = Math.round((totalStoriesInPlanning / Math.max(totalStories, 1)) * 100)
+
+      setProjects(dashboardProjects)
+      setRecentStories(sortedRecentStories)
+      setEpicsWithDeadlines(sortedEpicsWithDeadlines)
+      setStats({
+        totalProjects: userProjects.length,
+        activeProjects: dashboardProjects.filter(p => p.storiesInPlanning > 0 || p.storiesSprintReady > 0).length,
+        totalEpics,
+        activeEpics,
+        totalStories,
+        storiesInPlanning: totalStoriesInPlanning,
+        storiesSprintReady: totalStoriesSprintReady,
+        overallVelocity,
+        sprintReadiness
+      })
+      
     } catch (error) {
-      console.error('Error fetching analytics data:', error)
+      console.error('Error fetching dashboard data:', error)
     } finally {
-      setLoadingStats(false)
+      setLoadingData(false)
     }
   }
 
-  // Calculate advanced analytics
-  const analytics = React.useMemo(() => {
-    if (sessions.length === 0) {
-      return {
-        totalSessions: 0,
-        activeSessions: 0,
-        totalStories: 0,
-        estimatedStories: 0,
-        estimationRate: 0,
-        avgParticipants: 0,
-        totalParticipants: 0,
-        consensusRate: 0,
-        avgSessionDuration: 0,
-        productivity: 0,
-        recentActivity: 0
-      }
-    }
+  // Filter projects based on selection
+  const filteredProjects = selectedProjectId === 'all' 
+    ? projects 
+    : projects.filter(p => p.id === selectedProjectId)
 
-    const totalSessions = sessions.length
-    const activeSessions = sessions.filter(s => s.isActive).length
-    const totalStories = sessions.reduce((sum, s) => sum + s.stories.length, 0)
-    const estimatedStories = sessions.reduce((sum, s) => sum + s.stories.filter(story => story.isEstimated).length, 0)
-    const estimationRate = totalStories > 0 ? (estimatedStories / totalStories) * 100 : 0
-    
-    const allParticipants = sessions.flatMap(s => s.participants.map(p => p.id))
-    const uniqueParticipants = [...new Set(allParticipants)]
-    const avgParticipants = totalSessions > 0 ? allParticipants.length / totalSessions : 0
-    
-    // Consensus rate calculation
-    const storiesWithVoting = sessions.flatMap(s => s.stories.filter(story => story.votingHistory && story.votingHistory.length > 0))
-    const firstRoundConsensus = storiesWithVoting.filter(story => story.votingHistory!.length === 1).length
-    const consensusRate = storiesWithVoting.length > 0 ? (firstRoundConsensus / storiesWithVoting.length) * 100 : 0
-    
-    // Average session duration
-    const sessionsWithDuration = sessions.filter(s => !s.isActive)
-    const totalDuration = sessionsWithDuration.reduce((sum, s) => {
-      const duration = new Date(s.updatedAt).getTime() - new Date(s.createdAt).getTime()
-      return sum + duration
-    }, 0)
-    const avgSessionDuration = sessionsWithDuration.length > 0 ? totalDuration / sessionsWithDuration.length / (1000 * 60) : 0
-    
-    // Productivity metric (stories estimated per hour)
-    const productivity = avgSessionDuration > 0 ? (estimatedStories / (avgSessionDuration / 60)) : 0
-    
-    // Recent activity (sessions in last 30 days)
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    const recentActivity = sessions.filter(s => new Date(s.createdAt) > thirtyDaysAgo).length
+  // Filter recent stories based on project selection
+  const filteredRecentStories = selectedProjectId === 'all'
+    ? recentStories
+    : recentStories.filter(story => {
+        const project = projects.find(p => p.name === story.projectName)
+        return project?.id === selectedProjectId
+      })
 
+  // Filter epics with deadlines based on project selection
+  const filteredEpicsWithDeadlines = selectedProjectId === 'all'
+    ? epicsWithDeadlines
+    : epicsWithDeadlines.filter(epic => {
+        const project = projects.find(p => p.name === epic.projectName)
+        return project?.id === selectedProjectId
+      })
+
+  // Calculate filtered stats
+  const filteredStats = React.useMemo(() => {
+    if (selectedProjectId === 'all') return stats
+    
+    const project = projects.find(p => p.id === selectedProjectId)
+    if (!project) return stats
+    
     return {
-      totalSessions,
-      activeSessions,
-      totalStories,
-      estimatedStories,
-      estimationRate,
-      avgParticipants,
-      totalParticipants: uniqueParticipants.length,
-      consensusRate,
-      avgSessionDuration,
-      productivity,
-      recentActivity
+      totalProjects: 1,
+      activeProjects: (project.storiesInPlanning > 0 || project.storiesSprintReady > 0) ? 1 : 0,
+      totalEpics: project.epicsCount,
+      activeEpics: project.epicsCount, // Simplified
+      totalStories: project.storiesCount,
+      storiesInPlanning: project.storiesInPlanning,
+      storiesSprintReady: project.storiesSprintReady,
+      overallVelocity: Math.round((project.storiesSprintReady / Math.max(project.storiesCount, 1)) * 100),
+      sprintReadiness: Math.round((project.storiesInPlanning / Math.max(project.storiesCount, 1)) * 100)
     }
-  }, [sessions])
+  }, [selectedProjectId, projects, stats])
 
   if (loading) {
     return (
@@ -145,403 +348,475 @@ export default function DashboardPage() {
     )
   }
 
-  if (!user) {
-    return null
-  }
+  if (!user) return null
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <DashboardHeader />
 
-      {/* Main Content */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        {/* Header */}
+        <div className="mb-8">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">Analytics Dashboard</h1>
-            <p className="text-muted-foreground mt-1">Track your planning performance and team productivity</p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button asChild variant="outline" size="sm" className="sm:size-default">
-              <Link href="/planning">
-                <Calendar className="mr-2 h-4 w-4" />
-                View Sessions
-              </Link>
-            </Button>
-            <Button asChild size="sm" className="sm:size-lg">
-              <Link href="/create">
-                <Plus className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-                New Session
-              </Link>
-            </Button>
+            <h1 className="text-2xl sm:text-3xl font-bold">Project Management Dashboard</h1>
+            <p className="text-muted-foreground mt-1">Project overview and team productivity insights</p>
           </div>
         </div>
 
-        {/* Key Metrics Overview */}
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Sessions</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{loadingStats ? '--' : analytics.totalSessions}</div>
-              <p className="text-xs text-muted-foreground">
-                {analytics.activeSessions} currently active
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Estimation Rate</CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{loadingStats ? '--' : Math.round(analytics.estimationRate)}%</div>
-              <p className="text-xs text-muted-foreground">
-                {analytics.estimatedStories} of {analytics.totalStories} stories
-              </p>
-              <Progress value={analytics.estimationRate} className="mt-2" />
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Team Collaboration</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{loadingStats ? '--' : analytics.totalParticipants}</div>
-              <p className="text-xs text-muted-foreground">
-                Avg {analytics.avgParticipants.toFixed(1)} per session
-              </p>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Consensus Rate</CardTitle>
-              <Award className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{loadingStats ? '--' : Math.round(analytics.consensusRate)}%</div>
-              <p className="text-xs text-muted-foreground">
-                First-round agreements
-              </p>
-              <Progress value={analytics.consensusRate} className="mt-2" />
-            </CardContent>
-          </Card>
+        {/* Project Filter */}
+        <div className="mb-6">
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium">View:</label>
+            <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+              <SelectTrigger className="w-[250px]">
+                <SelectValue placeholder="Select view..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Projects</SelectItem>
+                {projects.map(project => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        {/* Performance Metrics */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
+        {/* Executive Summary Cards */}
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-8">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5" />
-                Session Efficiency
-              </CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
+              <Building2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Avg Duration</span>
-                  <span className="font-medium">{analytics.avgSessionDuration.toFixed(0)} min</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Productivity</span>
-                  <span className="font-medium">{analytics.productivity.toFixed(1)} stories/hr</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Recent Activity</span>
-                  <span className="font-medium">{analytics.recentActivity} sessions (30d)</span>
-                </div>
-              </div>
+            <CardContent>
+              <div className="text-2xl font-bold">{loadingData ? '--' : filteredStats.activeProjects}</div>
+              <p className="text-xs text-muted-foreground">
+                of {filteredStats.totalProjects} total
+              </p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5" />
-                Story Progress
-              </CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Sprint Ready</CardTitle>
+              <Rocket className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Estimated</span>
-                    <span>{analytics.estimatedStories}</span>
-                  </div>
-                  <Progress value={(analytics.estimatedStories / Math.max(analytics.totalStories, 1)) * 100} />
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Pending</span>
-                    <span>{analytics.totalStories - analytics.estimatedStories}</span>
-                  </div>
-                  <Progress value={((analytics.totalStories - analytics.estimatedStories) / Math.max(analytics.totalStories, 1)) * 100} />
-                </div>
-              </div>
+              <div className="text-2xl font-bold">{loadingData ? '--' : filteredStats.storiesSprintReady}</div>
+              <p className="text-xs text-muted-foreground">
+                {filteredStats.overallVelocity}% of stories
+              </p>
+              <Progress value={filteredStats.overallVelocity} className="mt-2" />
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Gauge className="h-5 w-5" />
-                Team Performance
-              </CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">In Planning</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {loadingStats ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                  </div>
-                ) : analytics.totalSessions === 0 ? (
-                  <div className="text-center py-8 text-sm text-muted-foreground">
-                    No data available
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Consensus Rate</span>
-                      <Badge variant={analytics.consensusRate > 70 ? "default" : analytics.consensusRate > 50 ? "secondary" : "outline"}>
-                        {Math.round(analytics.consensusRate)}%
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Estimation Rate</span>
-                      <Badge variant={analytics.estimationRate > 80 ? "default" : analytics.estimationRate > 60 ? "secondary" : "outline"}>
-                        {Math.round(analytics.estimationRate)}%
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">Productivity</span>
-                      <Badge variant={analytics.productivity > 5 ? "default" : analytics.productivity > 3 ? "secondary" : "outline"}>
-                        {analytics.productivity.toFixed(1)} s/hr
-                      </Badge>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <div className="text-2xl font-bold">{loadingData ? '--' : filteredStats.storiesInPlanning}</div>
+              <p className="text-xs text-muted-foreground">
+                Ready for estimation
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Stories</CardTitle>
+              <BookOpen className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{loadingData ? '--' : filteredStats.totalStories}</div>
+              <p className="text-xs text-muted-foreground">
+                Across {filteredStats.totalEpics} epics
+              </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Analytics Charts Section */}
-        <Tabs defaultValue="trends" className="space-y-4">
-          <div className="flex justify-center">
-            <TabsList className="h-12 p-1 text-base">
-              <TabsTrigger value="trends" className="px-6 py-2">Trends</TabsTrigger>
-              <TabsTrigger value="insights" className="px-6 py-2">Insights</TabsTrigger>
-              <TabsTrigger value="export" className="px-6 py-2">Export</TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="trends" className="space-y-4">
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5" />
-                    Session Activity (Simple Chart)
-                  </CardTitle>
-                  <CardDescription>Your planning sessions over time</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loadingStats ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin" />
-                    </div>
-                  ) : sessions.length === 0 ? (
-                    <div className="text-center py-8 text-sm text-muted-foreground">
-                      No session data available
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {/* Simple bar chart using divs */}
-                      <div className="space-y-2">
-                        {sessions.slice(-5).map((session, index) => (
-                          <div key={session.id} className="flex items-center gap-3">
-                            <div className="text-xs text-muted-foreground w-16 truncate">
-                              {new Date(session.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                            </div>
-                            <div className="flex-1 bg-muted rounded-full h-2">
-                              <div 
-                                className="bg-primary h-2 rounded-full" 
-                                style={{ width: `${Math.min(100, (session.stories.length / 10) * 100)}%` }}
-                              />
-                            </div>
-                            <div className="text-xs font-medium w-8">
-                              {session.stories.length}
-                            </div>
-                          </div>
-                        ))}
+        {/* Story Flow Visualization */}
+        <div className="grid gap-6 lg:grid-cols-3 mb-8">
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                Story Flow Pipeline
+              </CardTitle>
+              <CardDescription>
+                Story progression through your workflow
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingData ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Visual Pipeline */}
+                  <div className="relative">
+                    <div className="flex items-center justify-between">
+                      {/* Backlog */}
+                      <div className="text-center relative z-10">
+                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center mb-2 border-2 border-white dark:border-gray-900 shadow-sm">
+                          <FileText className="h-8 w-8 text-gray-600 dark:text-gray-400" />
+                        </div>
+                        <div className="text-sm font-medium">Backlog</div>
+                        <div className="text-2xl font-bold text-gray-600">
+                          {filteredStats.totalStories - filteredStats.storiesInPlanning - filteredStats.storiesSprintReady}
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground">Stories per session (max 10)</p>
+                      
+                      {/* Planning */}
+                      <div className="text-center relative z-10">
+                        <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mb-2 border-2 border-white dark:border-gray-900 shadow-sm">
+                          <Clock className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div className="text-sm font-medium">Planning</div>
+                        <div className="text-2xl font-bold text-blue-600">
+                          {filteredStats.storiesInPlanning}
+                        </div>
+                      </div>
+                      
+                      {/* Sprint Ready */}
+                      <div className="text-center relative z-10">
+                        <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center mb-2 border-2 border-white dark:border-gray-900 shadow-sm">
+                          <Rocket className="h-8 w-8 text-green-600 dark:text-green-400" />
+                        </div>
+                        <div className="text-sm font-medium">Sprint Ready</div>
+                        <div className="text-2xl font-bold text-green-600">
+                          {filteredStats.storiesSprintReady}
+                        </div>
+                      </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-5 w-5" />
-                    Estimation Progress
-                  </CardTitle>
-                  <CardDescription>Progress towards completing estimations</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
+                    
+                    {/* Progress Lines */}
+                    <div className="absolute top-8 left-0 right-0 flex items-center justify-between px-8">
+                      {/* First progress line */}
+                      <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full relative mx-4">
+                        <div 
+                          className="absolute inset-y-0 left-0 bg-blue-500 rounded-full transition-all duration-500" 
+                          style={{ width: `${Math.min(100, (filteredStats.storiesInPlanning / Math.max(filteredStats.totalStories, 1)) * 100 * 3)}%` }}
+                        ></div>
+                      </div>
+                      
+                      {/* Second progress line */}
+                      <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full relative mx-4">
+                        <div 
+                          className="absolute inset-y-0 left-0 bg-green-500 rounded-full transition-all duration-500" 
+                          style={{ width: `${Math.min(100, (filteredStats.storiesSprintReady / Math.max(filteredStats.totalStories, 1)) * 100 * 2)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Flow Metrics */}
+                  <div className="grid grid-cols-3 gap-4 pt-4 border-t">
                     <div className="text-center">
-                      <div className="text-3xl font-bold">{Math.round(analytics.estimationRate)}%</div>
-                      <p className="text-sm text-muted-foreground">Stories Estimated</p>
-                    </div>
-                    <Progress value={analytics.estimationRate} className="h-3" />
-                    <div className="grid grid-cols-2 gap-4 text-center">
-                      <div>
-                        <div className="text-lg font-semibold text-green-600">{analytics.estimatedStories}</div>
-                        <p className="text-xs text-muted-foreground">Completed</p>
+                      <div className="text-sm text-muted-foreground">Flow Efficiency</div>
+                      <div className="text-lg font-semibold">
+                        {Math.round((filteredStats.storiesInPlanning + filteredStats.storiesSprintReady) / Math.max(filteredStats.totalStories, 1) * 100)}%
                       </div>
-                      <div>
-                        <div className="text-lg font-semibold text-orange-600">{analytics.totalStories - analytics.estimatedStories}</div>
-                        <p className="text-xs text-muted-foreground">Pending</p>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-muted-foreground">Sprint Readiness</div>
+                      <div className="text-lg font-semibold">
+                        {filteredStats.overallVelocity}%
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-muted-foreground">Planning Queue</div>
+                      <div className="text-lg font-semibold">
+                        {filteredStats.sprintReadiness}%
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="insights" className="space-y-4">
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Zap className="h-5 w-5" />
-                    Performance Insights
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {analytics.totalSessions === 0 ? (
-                    <div className="text-center py-8 text-sm text-muted-foreground">
-                      Create sessions to see insights
+                  
+                  {/* Flow Health Indicators */}
+                  <div className="mt-4 pt-4 border-t space-y-3">
+                    <div className="text-sm font-medium text-muted-foreground mb-2">Flow Health</div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${filteredStats.storiesInPlanning > 0 ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                          <span>Planning Active</span>
+                        </div>
+                        <span className={filteredStats.storiesInPlanning > 0 ? 'text-blue-600 font-medium' : 'text-muted-foreground'}>
+                          {filteredStats.storiesInPlanning > 0 ? 'Yes' : 'No'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${filteredStats.storiesSprintReady > 0 ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                          <span>Sprint Queue</span>
+                        </div>
+                        <span className={filteredStats.storiesSprintReady > 0 ? 'text-green-600 font-medium' : 'text-muted-foreground'}>
+                          {filteredStats.storiesSprintReady > 0 ? 'Ready' : 'Empty'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            filteredStats.overallVelocity >= 30 ? 'bg-green-500' : 
+                            filteredStats.overallVelocity >= 15 ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}></div>
+                          <span>Velocity</span>
+                        </div>
+                        <span className={`font-medium ${
+                          filteredStats.overallVelocity >= 30 ? 'text-green-600' : 
+                          filteredStats.overallVelocity >= 15 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          {filteredStats.overallVelocity >= 30 ? 'Good' : 
+                           filteredStats.overallVelocity >= 15 ? 'Fair' : 'Low'}
+                        </span>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            (filteredStats.storiesInPlanning + filteredStats.storiesSprintReady) / Math.max(filteredStats.totalStories, 1) >= 0.5 ? 'bg-green-500' : 
+                            (filteredStats.storiesInPlanning + filteredStats.storiesSprintReady) / Math.max(filteredStats.totalStories, 1) >= 0.25 ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}></div>
+                          <span>Backlog Health</span>
+                        </div>
+                        <span className={`font-medium ${
+                          (filteredStats.storiesInPlanning + filteredStats.storiesSprintReady) / Math.max(filteredStats.totalStories, 1) >= 0.5 ? 'text-green-600' : 
+                          (filteredStats.storiesInPlanning + filteredStats.storiesSprintReady) / Math.max(filteredStats.totalStories, 1) >= 0.25 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          {(filteredStats.storiesInPlanning + filteredStats.storiesSprintReady) / Math.max(filteredStats.totalStories, 1) >= 0.5 ? 'Healthy' : 
+                           (filteredStats.storiesInPlanning + filteredStats.storiesSprintReady) / Math.max(filteredStats.totalStories, 1) >= 0.25 ? 'Fair' : 'Needs Work'}
+                        </span>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="p-3 border rounded-lg">
-                        <h4 className="font-medium text-sm mb-1">Team Efficiency</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Your team reaches consensus on <strong>{Math.round(analytics.consensusRate)}%</strong> of stories in the first round of voting.
-                        </p>
-                      </div>
-                      <div className="p-3 border rounded-lg">
-                        <h4 className="font-medium text-sm mb-1">Session Duration</h4>
-                        <p className="text-xs text-muted-foreground">
-                          Average session length is <strong>{analytics.avgSessionDuration.toFixed(0)} minutes</strong> with <strong>{analytics.productivity.toFixed(1)} stories per hour</strong>.
-                        </p>
-                      </div>
-                      <div className="p-3 border rounded-lg">
-                        <h4 className="font-medium text-sm mb-1">Activity Level</h4>
-                        <p className="text-xs text-muted-foreground">
-                          You&apos;ve hosted <strong>{analytics.recentActivity} sessions</strong> in the last 30 days with <strong>{analytics.totalParticipants} unique participants</strong>.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Target className="h-5 w-5" />
-                    Recommendations
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    {analytics.consensusRate < 50 && (
-                      <div className="p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
-                        <h4 className="font-medium text-sm text-orange-900 dark:text-orange-100">Improve Consensus</h4>
-                        <p className="text-xs text-orange-700 dark:text-orange-300">
-                          Consider discussing story requirements more before voting to improve first-round consensus.
-                        </p>
-                      </div>
-                    )}
-                    
-                    {analytics.avgSessionDuration > 120 && (
-                      <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                        <h4 className="font-medium text-sm text-blue-900 dark:text-blue-100">Session Length</h4>
-                        <p className="text-xs text-blue-700 dark:text-blue-300">
-                          Your sessions are running long. Try time-boxing discussions and preparing stories beforehand.
-                        </p>
-                      </div>
-                    )}
-                    
-                    {analytics.totalParticipants < 3 && analytics.totalSessions > 0 && (
-                      <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg">
-                        <h4 className="font-medium text-sm text-green-900 dark:text-green-100">Team Collaboration</h4>
-                        <p className="text-xs text-green-700 dark:text-green-300">
-                          Invite more team members to get diverse perspectives and better estimates.
-                        </p>
-                      </div>
-                    )}
-                    
-                    {analytics.totalSessions === 0 && (
-                      <div className="p-3 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-                        <h4 className="font-medium text-sm text-purple-900 dark:text-purple-100">Get Started</h4>
-                        <p className="text-xs text-purple-700 dark:text-purple-300">
-                          Create your first planning session to start tracking your team&apos;s estimation performance.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="export" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Export Data
-                </CardTitle>
-                <CardDescription>
-                  Export your planning session data and analytics
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <Button variant="outline" className="h-16 justify-start">
-                      <div className="text-left">
-                        <div className="font-medium">Session Summary</div>
-                        <div className="text-xs text-muted-foreground">Export session details and results</div>
-                      </div>
-                    </Button>
-                    <Button variant="outline" className="h-16 justify-start">
-                      <div className="text-left">
-                        <div className="font-medium">Analytics Report</div>
-                        <div className="text-xs text-muted-foreground">Download performance metrics</div>
-                      </div>
-                    </Button>
-                  </div>
-                  <div className="text-center py-8 text-sm text-muted-foreground">
-                    Export functionality coming soon
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recent Stories */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Recent Stories
+              </CardTitle>
+              <CardDescription>
+                Recently updated stories
+                {selectedProjectId !== 'all' && (
+                  <span> in {projects.find(p => p.id === selectedProjectId)?.name}</span>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingData ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : filteredRecentStories.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileText className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <div className="text-sm text-muted-foreground">
+                    No recent stories
+                    {selectedProjectId !== 'all' && ' in this project'}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredRecentStories.map((story) => (
+                    <div key={story.id} className="flex items-start justify-between gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{story.title}</div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`text-xs font-medium ${getStatusColor(story.status)}`}>
+                            {getStatusLabel(story.status)}
+                          </span>
+                          {selectedProjectId === 'all' && (
+                            <>
+                              <span className="text-xs text-muted-foreground">•</span>
+                              <span className="text-xs text-muted-foreground truncate">
+                                {story.projectName}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground whitespace-nowrap">
+                        {getRelativeTime(story.updatedAt)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Time Remaining Section */}
+        {filteredEpicsWithDeadlines.length > 0 && (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5" />
+                Time Remaining
+              </CardTitle>
+              <CardDescription>
+                Epic deadlines and time remaining
+                {selectedProjectId !== 'all' && (
+                  <span> in {projects.find(p => p.id === selectedProjectId)?.name}</span>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingData ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {filteredEpicsWithDeadlines.map((epic) => {
+                    const { text, color } = formatDaysRemaining(epic.daysRemaining, epic.isOverdue)
+                    return (
+                      <div key={epic.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div 
+                            className="w-8 h-8 rounded-md flex items-center justify-center text-sm flex-shrink-0"
+                            style={{ backgroundColor: epic.color + '20', color: epic.color }}
+                          >
+                            <Calendar className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-sm truncate">{epic.name}</div>
+                            {selectedProjectId === 'all' && (
+                              <div className="text-xs text-muted-foreground truncate">{epic.projectName}</div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className={`text-sm font-medium ${color}`}>
+                            {text}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {epic.targetDate.toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Project Portfolio */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Project Portfolio
+            </CardTitle>
+            <CardDescription>
+              Overview of all projects and their progress
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingData ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : filteredProjects.length === 0 ? (
+              <div className="text-center py-12">
+                <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">No Projects Found</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Create your first project to get started with story management
+                </p>
+                <Button asChild>
+                  <Link href="/projects">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Project
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredProjects.map((project) => (
+                  <div key={project.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h3 className="font-semibold text-lg">{project.name}</h3>
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{project.description}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium">{project.completionRate.toFixed(0)}% Ready</div>
+                        <div className="text-xs text-muted-foreground">
+                          Updated {new Date(project.lastActivity).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-4 gap-4 mb-3">
+                      <div className="text-center">
+                        <div className="text-lg font-semibold">{project.epicsCount}</div>
+                        <div className="text-xs text-muted-foreground">Epics</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold">{project.storiesCount}</div>
+                        <div className="text-xs text-muted-foreground">Stories</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-blue-600">{project.storiesInPlanning}</div>
+                        <div className="text-xs text-muted-foreground">Planning</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-semibold text-green-600">{project.storiesSprintReady}</div>
+                        <div className="text-xs text-muted-foreground">Sprint Ready</div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Progress value={(project.storiesSprintReady / Math.max(project.storiesCount, 1)) * 100} className="h-2" />
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Sprint Ready Progress</span>
+                        <span>{Math.round((project.storiesSprintReady / Math.max(project.storiesCount, 1)) * 100)}%</span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 mt-3">
+                      {/* Mobile: Show only 2 most important buttons */}
+                      <Button asChild size="sm" variant="outline" className="flex-1 sm:flex-initial">
+                        <Link href={`/stories?project=${project.id}`}>
+                          <span className="sm:hidden">Stories</span>
+                          <span className="hidden sm:inline">Manage Stories</span>
+                        </Link>
+                      </Button>
+                      <Button asChild size="sm" variant="outline" className="flex-1 sm:flex-initial">
+                        <Link href={`/planning?project=${project.id}`}>
+                          <span className="sm:hidden">Estimate</span>
+                          <span className="hidden sm:inline">Estimate Stories</span>
+                        </Link>
+                      </Button>
+                      {/* Desktop: Show third button */}
+                      <Button asChild size="sm" variant="outline" className="hidden sm:inline-flex">
+                        <Link href={`/epics?project=${project.id}`}>
+                          View Epics
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </main>
     </div>
   )
