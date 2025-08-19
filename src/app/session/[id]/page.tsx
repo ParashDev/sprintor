@@ -842,7 +842,7 @@ export default function SessionPage() {
                   {session.stories.length === 0 ? (
                     <div className="text-center py-6 text-muted-foreground">
                       <p>No ready stories found.</p>
-                      {isHost && <p className="text-sm">Create stories in the Stories page and mark them as 'Ready' to import them here.</p>}
+                      {isHost && <p className="text-sm">Create stories in the Stories page and mark them as &apos;Ready&apos; to import them here.</p>}
                     </div>
                   ) : (
                     session.stories.map((story) => (

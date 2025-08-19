@@ -336,7 +336,7 @@ export async function syncSessionWithProjectStories(sessionId: string, projectSt
     const sessionRef = doc(db, 'sessions', sessionId)
     
     // Check if current voting story was removed
-    const updateData: any = {
+    const baseUpdateData = {
       stories: finalStories.map(s => ({
         ...s,
         createdAt: s.createdAt instanceof Date ? Timestamp.fromDate(s.createdAt) : s.createdAt
@@ -345,18 +345,20 @@ export async function syncSessionWithProjectStories(sessionId: string, projectSt
     }
 
     // If the current voting story was removed, stop voting
-    if (session.currentStoryId && 
-        !finalStories.some(story => story.id === session.currentStoryId)) {
-      updateData.currentStoryId = null
-      updateData.votingInProgress = false
-      updateData.votesRevealed = false
-      // Clear all votes
-      updateData.participants = session.participants.map(p => ({
-        ...p,
-        vote: null,
-        lastSeen: p.lastSeen instanceof Date ? Timestamp.fromDate(p.lastSeen) : p.lastSeen
-      }))
-    }
+    const updateData = session.currentStoryId && 
+      !finalStories.some(story => story.id === session.currentStoryId) 
+      ? {
+          ...baseUpdateData,
+          currentStoryId: null as string | null,
+          votingInProgress: false,
+          votesRevealed: false,
+          participants: session.participants.map(p => ({
+            ...p,
+            vote: null as string | null,
+            lastSeen: p.lastSeen instanceof Date ? Timestamp.fromDate(p.lastSeen) : p.lastSeen
+          }))
+        }
+      : baseUpdateData
 
     await updateDoc(sessionRef, updateData)
   }

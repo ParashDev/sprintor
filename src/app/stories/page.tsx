@@ -1200,7 +1200,7 @@ function StoriesContent() {
                   Delete Story
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Are you sure you want to delete "{storyToDelete?.title}"? This action cannot be undone.
+                  Are you sure you want to delete &quot;{storyToDelete?.title}&quot;? This action cannot be undone.
                 </p>
               </div>
               
