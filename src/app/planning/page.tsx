@@ -5,7 +5,10 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
 import { getSessionsByProject, getProjectSessionStats } from "@/lib/session-service"
 import { getProjectsByOwner } from "@/lib/project-service"
+import { getEpicsByProject, subscribeToProjectEpics } from "@/lib/epic-service"
+import { getStoriesByProject } from "@/lib/story-service"
 import type { Session } from "@/types/session"
+import type { Epic } from "@/types/epic"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -25,7 +28,8 @@ import {
   History, 
   Users, 
   Loader2,
- 
+  Target,
+  CheckCircle2,
   FileText,
   Calendar,
   TrendingUp,
@@ -49,12 +53,19 @@ function PlanningContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const urlProjectId = searchParams.get('project')
+  const urlEpicId = searchParams.get('epic')
   
   // Project state
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [loadingProjects, setLoadingProjects] = useState(true)
+  
+  // Epic state
+  const [epics, setEpics] = useState<Epic[]>([])
+  const [selectedEpicId, setSelectedEpicId] = useState<string>('')
+  const [selectedEpic, setSelectedEpic] = useState<Epic | null>(null)
+  const [loadingEpics, setLoadingEpics] = useState(false)
   
   // Session state
   const [sessions, setSessions] = useState<Session[]>([])
@@ -104,13 +115,58 @@ function PlanningContent() {
   }, [urlProjectId, projects, selectedProjectId])
 
   useEffect(() => {
-    // Fetch sessions when project is selected (only for initial loads and URL changes)
-    if (selectedProjectId && selectedProject && user && !loadingSessions) {
+    // Subscribe to epics when project is selected (same pattern as Stories page)
+    if (selectedProjectId && selectedProject && user) {
+      setLoadingEpics(true)
+      const unsubscribe = subscribeToProjectEpics(selectedProjectId, (updatedEpics) => {
+        setEpics(updatedEpics)
+        setLoadingEpics(false)
+        
+        // Handle epic selection from URL or auto-select first epic
+        if (updatedEpics.length > 0) {
+          if (urlEpicId) {
+            const epic = updatedEpics.find(e => e.id === urlEpicId)
+            if (epic) {
+              setSelectedEpicId(urlEpicId)
+              setSelectedEpic(epic)
+            } else {
+              // URL epic not found, select first epic
+              setSelectedEpicId(updatedEpics[0].id)
+              setSelectedEpic(updatedEpics[0])
+            }
+          } else if (!selectedEpicId) {
+            // No URL epic and no current selection, select first epic
+            setSelectedEpicId(updatedEpics[0].id)
+            setSelectedEpic(updatedEpics[0])
+          }
+        }
+      })
+      
+      return () => unsubscribe()
+    } else {
+      setEpics([])
+      setSelectedEpicId('')
+      setSelectedEpic(null)
+    }
+  }, [selectedProjectId, selectedProject, user, urlEpicId])
+
+  useEffect(() => {
+    // Fetch sessions when project OR epic changes (but only after epics are loaded)
+    if (selectedProjectId && selectedProject && user && !loadingEpics && !loadingProjects) {
       fetchSessionData()
     } else if (!selectedProjectId || !selectedProject) {
       setSessions([])
+      setStats({
+        totalSessions: 0,
+        storiesEstimated: 0,
+        storiesInPlanning: 0,
+        storiesSprintReady: 0,
+        totalStories: 0,
+        teamMembers: 0,
+        avgEstimationTime: '--'
+      })
     }
-  }, [selectedProjectId, selectedProject, user])
+  }, [selectedProjectId, selectedProject, selectedEpicId, user, loadingEpics, loadingProjects])
 
   const fetchProjects = async () => {
     if (!user) return
@@ -126,19 +182,32 @@ function PlanningContent() {
     }
   }
 
+
   const fetchSessionData = async () => {
     if (!user || !selectedProject) return
     
     setLoadingSessions(true)
     try {
-      // Get sessions and stats for the selected project only
-      const [projectSessions, projectStats] = await Promise.all([
-        getSessionsByProject(user.uid, selectedProject.id),
-        getProjectSessionStats(user.uid, selectedProject.id)
-      ])
+      // Get all sessions for the project
+      const projectSessions = await getSessionsByProject(user.uid, selectedProject.id)
       
-      setSessions(projectSessions)
-      setStats(projectStats)
+      // Filter sessions by epic if one is selected
+      let filteredSessions = projectSessions
+      if (selectedEpicId && selectedEpicId !== 'all') {
+        // Sessions that are associated with the selected epic
+        filteredSessions = projectSessions.filter(session => 
+          // Show session if it's directly associated with the selected epic
+          session.epicId === selectedEpicId ||
+          // Show session if it has stories from the selected epic
+          session.stories.some(story => story.epicId === selectedEpicId)
+        )
+      }
+      
+      // Calculate epic-specific stats
+      const epicStats = await calculateEpicStats(selectedProject.id, selectedEpicId)
+      
+      setSessions(filteredSessions)
+      setStats(epicStats)
     } catch (error) {
       console.error('Error fetching session data:', error)
     } finally {
@@ -146,35 +215,96 @@ function PlanningContent() {
     }
   }
 
-  const handleProjectChange = async (projectId: string) => {
+  const calculateEpicStats = async (projectId: string, epicId: string) => {
+    try {
+      // Get stories for the epic (or all stories if no specific epic selected)
+      const stories = await getStoriesByProject(projectId, 
+        epicId && epicId !== 'all' ? { epicId } : {}
+      )
+      
+      // Get all sessions for the project
+      const allSessions = await getSessionsByProject(user!.uid, projectId)
+      
+      // Filter sessions that include stories from this epic
+      let relevantSessions = allSessions
+      if (epicId && epicId !== 'all') {
+        relevantSessions = allSessions.filter(session => 
+          // Show session if it's directly associated with the selected epic
+          session.epicId === epicId ||
+          // Show session if it has stories from the selected epic
+          session.stories.some(story => story.epicId === epicId)
+        )
+      }
+      
+      // Calculate stats
+      const totalSessions = relevantSessions.length
+      const storiesEstimated = stories.filter(s => s.storyPoints && s.storyPoints > 0).length
+      const storiesInPlanning = stories.filter(s => s.status === 'planning').length
+      const storiesSprintReady = stories.filter(s => s.status === 'sprint_ready').length
+      
+      // Calculate unique participants across relevant sessions
+      const allParticipants = new Set()
+      relevantSessions.forEach(session => {
+        session.participants.forEach(p => allParticipants.add(p.name))
+      })
+      
+      return {
+        totalSessions,
+        storiesEstimated,
+        storiesInPlanning,
+        storiesSprintReady,
+        totalStories: stories.length,
+        teamMembers: allParticipants.size,
+        avgEstimationTime: '--' // Keep as placeholder for now
+      }
+    } catch (error) {
+      console.error('Error calculating epic stats:', error)
+      return {
+        totalSessions: 0,
+        storiesEstimated: 0,
+        storiesInPlanning: 0,
+        storiesSprintReady: 0,
+        totalStories: 0,
+        teamMembers: 0,
+        avgEstimationTime: '--'
+      }
+    }
+  }
+
+  const handleProjectChange = (projectId: string) => {
     const project = projects.find(p => p.id === projectId)
     if (project) {
-      // Clear sessions immediately to prevent showing wrong sessions
+      // Clear sessions and epics immediately to prevent showing wrong data
       setSessions([])
-      setLoadingSessions(true)
+      setEpics([])
+      setSelectedEpicId('')
+      setSelectedEpic(null)
       
+      // Update state - this will trigger the useEffect to fetch epics and sessions
       setSelectedProjectId(projectId)
       setSelectedProject(project)
       
       // Update URL without page reload
       window.history.replaceState({}, '', `/planning?project=${projectId}`)
-      
-      // Immediately fetch sessions for the new project
-      if (user) {
-        try {
-          const [projectSessions, projectStats] = await Promise.all([
-            getSessionsByProject(user.uid, projectId),
-            getProjectSessionStats(user.uid, projectId)
-          ])
-          
-          setSessions(projectSessions)
-          setStats(projectStats)
-        } catch (error) {
-          console.error('Error fetching session data:', error)
-        } finally {
-          setLoadingSessions(false)
-        }
-      }
+    }
+  }
+
+  const handleEpicChange = (epicId: string) => {
+    const epic = epics.find(e => e.id === epicId)
+    setSelectedEpicId(epicId)
+    setSelectedEpic(epic || null)
+    
+    // Update URL with epic parameter
+    if (selectedProject) {
+      const url = epicId === 'all' || !epicId
+        ? `/planning?project=${selectedProject.id}`
+        : `/planning?project=${selectedProject.id}&epic=${epicId}`
+      window.history.replaceState({}, '', url)
+    }
+    
+    // Refetch sessions with new epic filter
+    if (user && selectedProject) {
+      fetchSessionData()
     }
   }
 
@@ -264,18 +394,25 @@ function PlanningContent() {
               <p className="text-muted-foreground mt-1">Manage estimation sessions for your projects</p>
             </div>
             <Button size="lg" disabled={!selectedProject} asChild>
-              <Link href={selectedProject ? `/create?project=${selectedProject.id}` : "/create"}>
+              <Link href={
+                selectedProject && selectedEpicId && selectedEpicId !== 'all' 
+                  ? `/create?project=${selectedProject.id}&epic=${selectedEpicId}`
+                  : selectedProject 
+                    ? `/create?project=${selectedProject.id}` 
+                    : "/create"
+              }>
                 <Plus className="mr-2 h-5 w-5" />
                 New Session
               </Link>
             </Button>
           </div>
           
-          {/* Project Selector */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
-            <div className="flex items-center gap-3">
+          {/* Project and Epic Selectors */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            {/* Project Selector */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
               <label className="text-sm font-medium whitespace-nowrap">Project:</label>
-              <div className="min-w-[200px]">
+              <div className="w-full sm:min-w-[200px]">
                 <Select value={selectedProjectId} onValueChange={handleProjectChange}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select project..." />
@@ -293,6 +430,39 @@ function PlanningContent() {
                 </Select>
               </div>
             </div>
+
+            {/* Epic Selector */}
+            {selectedProject && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+                <label className="text-sm font-medium whitespace-nowrap">Epic:</label>
+                <div className="w-full sm:min-w-[200px]">
+                  <Select value={selectedEpicId} onValueChange={handleEpicChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select epic..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">
+                        <span>All Epics</span>
+                      </SelectItem>
+                      {epics.map((epic) => (
+                        <SelectItem key={epic.id} value={epic.id}>
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-sm flex-shrink-0"
+                              style={{ backgroundColor: epic.color }}
+                            />
+                            <span className="truncate">{epic.name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              ({epic.storyCount} stories)
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
             
             {!selectedProject && projects.length === 0 && (
               <Button asChild>
@@ -305,53 +475,58 @@ function PlanningContent() {
           </div>
         </div>
 
-        {/* Stats Cards */}
+        {/* Epic-Specific Stats Cards */}
         <div className="grid gap-4 grid-cols-2 md:grid-cols-4 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Sessions</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Epic Stories</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {stats.totalStories}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {stats.totalStories === 0 ? "No stories yet" : selectedEpicId ? "In this epic" : "Across all epics"}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Stories in Planning</CardTitle>
+              <Target className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {stats.storiesInPlanning}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {stats.storiesInPlanning === 0 ? "No stories in planning" : "Ready for estimation"}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Ready for Sprint</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.storiesSprintReady}</div>
+              <p className="text-xs text-muted-foreground">
+                {stats.storiesSprintReady === 0 ? "No stories ready" : "Sprint-ready stories"}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Planning Sessions</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.totalSessions}</div>
               <p className="text-xs text-muted-foreground">
-                {stats.totalSessions === 0 ? "No sessions yet" : "Sessions hosted"}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Stories Estimated</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.storiesEstimated}</div>
-              <p className="text-xs text-muted-foreground">
-                {stats.storiesEstimated === 0 ? "Start your first session" : "Stories completed"}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Team Members</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.teamMembers}</div>
-              <p className="text-xs text-muted-foreground">
-                {stats.teamMembers === 0 ? "Invite your team" : "Unique participants"}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Avg. Estimation Time</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.avgEstimationTime}</div>
-              <p className="text-xs text-muted-foreground">
-                {stats.avgEstimationTime === '--' ? "No data yet" : "Minutes per story"}
+                {stats.totalSessions === 0 ? "No sessions yet" : 
+                 selectedEpicId === 'all' ? "All project sessions" : "Epic sessions"}
               </p>
             </CardContent>
           </Card>
@@ -457,7 +632,13 @@ function PlanningContent() {
                       Create your first session to get started with sprint planning
                     </p>
                     <Button asChild>
-                      <Link href={selectedProject ? `/create?project=${selectedProject.id}` : "/create"}>
+                      <Link href={
+                        selectedProject && selectedEpicId && selectedEpicId !== 'all' 
+                          ? `/create?project=${selectedProject.id}&epic=${selectedEpicId}`
+                          : selectedProject 
+                            ? `/create?project=${selectedProject.id}` 
+                            : "/create"
+                      }>
                         <Plus className="mr-2 h-4 w-4" />
                         Create First Session
                       </Link>
