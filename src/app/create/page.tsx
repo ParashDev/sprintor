@@ -164,7 +164,7 @@ function CreateSessionContent() {
     // Reset epic selection when project changes
     setSelectedEpicId('')
     setSelectedEpic(null)
-    setReadyStoriesCount(0)
+    setPlanningStoriesCount(0)
   }
 
   const handleEpicChange = (epicId: string) => {
