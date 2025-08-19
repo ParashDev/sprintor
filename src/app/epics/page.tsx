@@ -93,11 +93,8 @@ function EpicsPageContent() {
   const [epicStoryCounts, setEpicStoryCounts] = useState<Record<string, { 
     total: number, 
     backlog: number, 
-    ready: number, 
-    inProgress: number, 
-    review: number, 
-    testing: number, 
-    done: number 
+    planning: number, 
+    sprintReady: number 
   }>>({})
   const [deletingEpicId, setDeletingEpicId] = useState<string>('')
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -146,11 +143,8 @@ function EpicsPageContent() {
       const counts: Record<string, { 
         total: number, 
         backlog: number, 
-        ready: number, 
-        inProgress: number, 
-        review: number, 
-        testing: number, 
-        done: number 
+        planning: number, 
+        sprintReady: number 
       }> = {}
       
       stories.forEach(story => {
@@ -159,11 +153,8 @@ function EpicsPageContent() {
             counts[story.epicId] = { 
               total: 0, 
               backlog: 0, 
-              ready: 0, 
-              inProgress: 0, 
-              review: 0, 
-              testing: 0, 
-              done: 0 
+              planning: 0, 
+              sprintReady: 0 
             }
           }
           counts[story.epicId].total++
@@ -173,20 +164,11 @@ function EpicsPageContent() {
             case 'backlog':
               counts[story.epicId].backlog++
               break
-            case 'ready':
-              counts[story.epicId].ready++
+            case 'planning':
+              counts[story.epicId].planning++
               break
-            case 'in_progress':
-              counts[story.epicId].inProgress++
-              break
-            case 'review':
-              counts[story.epicId].review++
-              break
-            case 'testing':
-              counts[story.epicId].testing++
-              break
-            case 'done':
-              counts[story.epicId].done++
+            case 'sprint_ready':
+              counts[story.epicId].sprintReady++
               break
           }
         }
@@ -548,34 +530,16 @@ function EpicsPageContent() {
                           <span className="font-medium">{epicStoryCounts[epic.id].backlog}</span>
                         </div>
                       )}
-                      {epicStoryCounts[epic.id]?.ready > 0 && (
+                      {epicStoryCounts[epic.id]?.planning > 0 && (
                         <div className="flex items-center justify-between bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded">
-                          <span className="text-blue-600 dark:text-blue-400">Ready</span>
-                          <span className="font-medium">{epicStoryCounts[epic.id].ready}</span>
+                          <span className="text-blue-600 dark:text-blue-400">Planning</span>
+                          <span className="font-medium">{epicStoryCounts[epic.id].planning}</span>
                         </div>
                       )}
-                      {epicStoryCounts[epic.id]?.inProgress > 0 && (
-                        <div className="flex items-center justify-between bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 rounded">
-                          <span className="text-yellow-600 dark:text-yellow-400">In Progress</span>
-                          <span className="font-medium">{epicStoryCounts[epic.id].inProgress}</span>
-                        </div>
-                      )}
-                      {epicStoryCounts[epic.id]?.review > 0 && (
-                        <div className="flex items-center justify-between bg-orange-100 dark:bg-orange-900/30 px-2 py-1 rounded">
-                          <span className="text-orange-600 dark:text-orange-400">Review</span>
-                          <span className="font-medium">{epicStoryCounts[epic.id].review}</span>
-                        </div>
-                      )}
-                      {epicStoryCounts[epic.id]?.testing > 0 && (
-                        <div className="flex items-center justify-between bg-purple-100 dark:bg-purple-900/30 px-2 py-1 rounded">
-                          <span className="text-purple-600 dark:text-purple-400">Testing</span>
-                          <span className="font-medium">{epicStoryCounts[epic.id].testing}</span>
-                        </div>
-                      )}
-                      {epicStoryCounts[epic.id]?.done > 0 && (
+                      {epicStoryCounts[epic.id]?.sprintReady > 0 && (
                         <div className="flex items-center justify-between bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">
-                          <span className="text-green-600 dark:text-green-400">Done</span>
-                          <span className="font-medium">{epicStoryCounts[epic.id].done}</span>
+                          <span className="text-green-600 dark:text-green-400">Sprint Ready</span>
+                          <span className="font-medium">{epicStoryCounts[epic.id].sprintReady}</span>
                         </div>
                       )}
                       
