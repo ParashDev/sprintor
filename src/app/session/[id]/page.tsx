@@ -5,14 +5,6 @@ import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import { 
   Users, 
   Plus, 
@@ -22,17 +14,15 @@ import {
   Circle,
   CheckCircle2,
   Target,
-  BarChart3,
-  Edit3,
-  Trash2
+  BarChart3
 } from "lucide-react"
-import { subscribeToSession, addStory, deleteStory, startVoting, castVote, revealVotes, endVoting, updateParticipantHeartbeat, cleanupInactiveParticipants, joinSession } from "@/lib/session-service"
+import { subscribeToSession, syncSessionWithProjectStories, startVoting, castVote, revealVotes, endVoting, updateParticipantHeartbeat, cleanupInactiveParticipants, joinSession } from "@/lib/session-service"
 import { getStoriesByProject, subscribeToProjectStories, updateStory } from "@/lib/story-service"
 import { SessionHeader } from "@/components/session/SessionHeader"
 import { SessionReconnectModal } from "@/components/session/SessionReconnectModal"
 import { SessionEndedDialog } from "@/components/session/SessionEndedDialog"
 import CreateStoryModal from "@/components/stories/CreateStoryModal"
-import type { Session } from "@/types/session"
+import type { Session, SessionStory } from "@/types/session"
 
 const PREDEFINED_DECKS = {
   fibonacci: ['1', '2', '3', '5', '8', '13', '21', '?'],
@@ -66,12 +56,11 @@ export default function SessionPage() {
   const [importingStories, setImportingStories] = useState(false)
   const [projectName, setProjectName] = useState<string>('')
   
-  // Story management
-  const [showCreateStoryModal, setShowCreateStoryModal] = useState(false)
+  // Story display
   const [expandedStory, setExpandedStory] = useState<string | null>(null)
-  const [editingSessionStory, setEditingSessionStory] = useState<any | null>(null)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [storyToDelete, setStoryToDelete] = useState<{ id: string, title: string } | null>(null)
+  
+  // Emergency story creation
+  const [showEmergencyStoryModal, setShowEmergencyStoryModal] = useState(false)
 
   useEffect(() => {
     const userId = localStorage.getItem('sprintor_user_id')
@@ -182,22 +171,8 @@ export default function SessionPage() {
         status: ['ready']
       })
 
-
-      // Add each story to the session
-      for (const story of readyStories) {
-        try {
-          await addStory(sessionId, {
-            title: story.title,
-            description: story.description || '',
-            estimate: null,
-            isEstimated: false,
-            votingHistory: [],
-            originalStoryId: story.id  // Store reference to original project story
-          })
-        } catch (error) {
-          console.error(`Failed to import story: ${story.title}`, error)
-        }
-      }
+      // Sync session with ready stories
+      await syncSessionWithProjectStories(sessionId, readyStories, sessionData.epicId!)
 
       setStoriesImported(true)
     } catch (error) {
@@ -225,38 +200,22 @@ export default function SessionPage() {
   useEffect(() => {
     if (!session?.projectId || !session?.epicId || !isHost) return
 
-    const unsubscribe = subscribeToProjectStories(session.projectId, (projectStories) => {
-      // Skip if we're currently importing or haven't finished initial import
-      if (importingStories || !storiesImported) {
+    const unsubscribe = subscribeToProjectStories(session.projectId, async (projectStories) => {
+      // Skip if we're currently importing
+      if (importingStories) {
         return
       }
 
-      // Find ready stories for this epic that aren't already in the session
-      const readyStoriesForEpic = projectStories.filter(story => 
-        story.status === 'ready' && 
-        story.epicId === session.epicId &&
-        !session.stories.some(sessionStory => sessionStory.originalStoryId === story.id)
-      )
-
-      // Add each new ready story to the session
-      readyStoriesForEpic.forEach(async (story) => {
-        try {
-          await addStory(sessionId, {
-            title: story.title,
-            description: story.description,
-            estimate: null,
-            isEstimated: false,
-            votingHistory: [],
-            originalStoryId: story.id  // Store reference to original project story
-          })
-        } catch (error) {
-          // Silently handle errors to avoid console spam
-        }
-      })
+      // Sync session with all current project stories (handles adds, updates, deletes)
+      try {
+        await syncSessionWithProjectStories(sessionId, projectStories, session.epicId!)
+      } catch (error) {
+        console.error('Error syncing session with project stories:', error)
+      }
     })
 
     return unsubscribe
-  }, [session?.projectId, session?.epicId, session?.stories, isHost, sessionId, importingStories, storiesImported])
+  }, [session?.projectId, session?.epicId, isHost, sessionId, importingStories])
 
   const handleReconnect = async () => {
     const userId = localStorage.getItem('sprintor_user_id')
@@ -341,13 +300,11 @@ export default function SessionPage() {
     return PREDEFINED_DECKS[session.deckType] || PREDEFINED_DECKS.fibonacci
   }
 
-  const handleStoryCreated = async () => {
+  // Emergency story creation handler
+  const handleEmergencyStoryCreated = () => {
     // Story was created in project with "ready" status
     // Session will automatically pick it up through real-time subscriptions
-    
-    // Close the modal and reset editing state
-    setShowCreateStoryModal(false)
-    setEditingSessionStory(null)
+    setShowEmergencyStoryModal(false)
   }
 
   const handleStartVoting = async (storyId: string) => {
@@ -378,73 +335,41 @@ export default function SessionPage() {
     try {
       await endVoting(sessionId, estimate)
       
-      // Sync estimate back to original project story if story has original ID
-      if (estimate && session?.currentStoryId) {
-        const currentStory = session.stories.find(s => s.id === session.currentStoryId)
-        
-        if (currentStory?.originalStoryId) {
-          try {
-            const storyPoints = parseInt(estimate)
-            const updateData = {
-              storyPoints: isNaN(storyPoints) ? undefined : storyPoints,
-              updatedAt: new Date()
-            }
-            
-            await updateStory(currentStory.originalStoryId, updateData)
-          } catch (syncError) {
-            console.error('Error syncing story points:', syncError)
-          }
-        }
-      }
+      // After ending voting, the endVoting function calculates the final estimate
+      // We'll sync it via a separate effect that watches for story changes
     } catch (error) {
       console.error('Error ending voting:', error)
     }
   }
 
-  const handleEditStoryClick = (story: any) => {
-    // Convert session story to the format expected by CreateStoryModal
-    const storyForModal = {
-      id: story.id,
-      title: story.title,
-      description: story.description || '',
-      type: 'story' as const,
-      asA: '',
-      iWant: '',
-      soThat: '',
-      businessValue: 5,
-      priority: 'Should Have' as const,
-      riskLevel: 'Medium' as const,
-      complexity: 'Moderate' as const,
-      acceptanceCriteria: [],
-      storyPoints: undefined,
-      timeEstimate: '',
-      estimationConfidence: 'Medium' as const,
-      epicId: session?.epicId || '',
-      labels: []
-    }
-    
-    setEditingSessionStory(storyForModal)
-    setShowCreateStoryModal(true)
-  }
+  // Sync estimates back to project stories whenever session stories change (HOST ONLY)
+  useEffect(() => {
+    if (!session?.stories || !isHost) return // Only host can sync estimates
 
-  const handleDeleteStory = (storyId: string, storyTitle: string) => {
-    setStoryToDelete({ id: storyId, title: storyTitle })
-    setShowDeleteDialog(true)
-  }
+    const syncEstimates = async () => {
+      const estimatedStories: SessionStory[] = session.stories.filter((story): story is SessionStory => 
+        story.isEstimated && story.estimate !== null && story.originalStoryId !== undefined
+      )
 
-  const confirmDeleteStory = async () => {
-    if (!storyToDelete) return
-    
-    try {
-      await deleteStory(sessionId, storyToDelete.id)
-      setShowDeleteDialog(false)
-      setStoryToDelete(null)
-    } catch (error) {
-      console.error('Error deleting story:', error)
-      setShowDeleteDialog(false)
-      setStoryToDelete(null)
+      for (const sessionStory of estimatedStories) {
+        try {
+          const storyPoints = parseInt(sessionStory.estimate!)
+          await updateStory(sessionStory.originalStoryId!, {
+            storyPoints: isNaN(storyPoints) ? undefined : storyPoints,
+            updatedAt: new Date()
+          })
+        } catch (error) {
+          console.error(`Failed to sync estimate for story ${sessionStory.originalStoryId}:`, error)
+        }
+      }
     }
-  }
+
+    // Debounce the sync to avoid too many calls
+    const timeoutId = setTimeout(syncEstimates, 1000)
+    return () => clearTimeout(timeoutId)
+  }, [session?.stories?.map(s => `${s.id}-${s.estimate}-${s.isEstimated}`).join(','), isHost])
+
+  // NOTE: Story editing and deletion removed - stories are managed in Stories page only
 
   if (loading) {
     return (
@@ -475,8 +400,8 @@ export default function SessionPage() {
     )
   }
 
-  const currentStory = session.currentStoryId 
-    ? session.stories.find(s => s.id === session.currentStoryId)
+  const currentStory: SessionStory | null = session.currentStoryId 
+    ? session.stories.find(s => s.id === session.currentStoryId) || null
     : null
 
   const estimationCards = getEstimationCards()
@@ -809,9 +734,8 @@ export default function SessionPage() {
                         )}
                         {session.votesRevealed && (
                           <Button size="sm" onClick={() => {
-                            // Get the final estimate from the current story
-                            const finalEstimate = currentStory.estimate || undefined
-                            handleEndVoting(finalEstimate)
+                            // Let endVoting calculate the estimate from current votes
+                            handleEndVoting() // Don't pass old estimate - let it calculate fresh
                           }}>
                             Save Voting
                           </Button>
@@ -901,9 +825,14 @@ export default function SessionPage() {
                 <CardTitle className="flex items-center justify-between text-base">
                   User Stories ({session.stories.length})
                   {isHost && (
-                    <Button size="sm" onClick={() => setShowCreateStoryModal(true)}>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => setShowEmergencyStoryModal(true)}
+                      title="Create emergency story (will be marked as 'Ready' for immediate use)"
+                    >
                       <Plus className="h-4 w-4 mr-2" />
-                      Add Story
+                      Emergency Story
                     </Button>
                   )}
                 </CardTitle>
@@ -912,8 +841,8 @@ export default function SessionPage() {
                 <div className="space-y-2">
                   {session.stories.length === 0 ? (
                     <div className="text-center py-6 text-muted-foreground">
-                      <p>No stories added yet.</p>
-                      {isHost && <p className="text-sm">Add your first user story to start estimating!</p>}
+                      <p>No ready stories found.</p>
+                      {isHost && <p className="text-sm">Create stories in the Stories page and mark them as 'Ready' to import them here.</p>}
                     </div>
                   ) : (
                     session.stories.map((story) => (
@@ -958,32 +887,6 @@ export default function SessionPage() {
                                   </Button>
                                 )}
                               </div>
-                              {isHost && (
-                                <div className="flex items-center gap-1">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleEditStoryClick(story)
-                                    }}
-                                    className="h-6 w-6 p-0"
-                                  >
-                                    <Edit3 className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      handleDeleteStory(story.id, story.title)
-                                    }}
-                                    className="h-6 w-6 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              )}
                             </div>
                           </div>
                         </div>
@@ -1033,41 +936,18 @@ export default function SessionPage() {
         </div>
       </div>
 
-      {/* Delete Story Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Story</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete "{storyToDelete?.title}"? This action cannot be undone and will remove all voting history for this story.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" onClick={confirmDeleteStory}>
-              Delete Story
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Story Modal */}
-      {session.projectId && (
+      {/* Emergency Story Creation Modal */}
+      {session?.projectId && (
         <CreateStoryModal
-          isOpen={showCreateStoryModal}
-          onClose={() => {
-            setShowCreateStoryModal(false)
-            setEditingSessionStory(null)
-          }}
+          isOpen={showEmergencyStoryModal}
+          onClose={() => setShowEmergencyStoryModal(false)}
           projectId={session.projectId}
-          onStoryCreated={handleStoryCreated}
+          onStoryCreated={handleEmergencyStoryCreated}
           defaultEpicId={session.epicId}
-          editingStory={editingSessionStory}
-          sessionMode={true}
+          sessionMode={true} // Force 'ready' status instead of 'backlog'
         />
       )}
+
     </div>
   )
 }

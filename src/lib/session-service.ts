@@ -15,7 +15,8 @@ import {
   getDocs
 } from 'firebase/firestore'
 import { db } from './firebase'
-import type { Session, Participant, Story } from '@/types/session'
+import type { Session, Participant, SessionStory } from '@/types/session'
+import type { Story } from '@/types/story'
 import { updateStory } from './story-service'
 
 // Firestore document types for proper timestamp handling
@@ -265,94 +266,108 @@ export async function markParticipantOffline(sessionId: string, participantId: s
   })
 }
 
-// Add story to session
-export async function addStory(sessionId: string, story: Omit<Story, 'id' | 'createdAt'>): Promise<void> {
+// NOTE: Story creation removed - sessions now import ready stories only
+
+// NOTE: Story editing removed - stories are managed in Stories page only
+
+// NOTE: Story deletion removed - stories are managed in Stories page only
+
+// Sync session stories with current project stories state
+export async function syncSessionWithProjectStories(sessionId: string, projectStories: Story[], epicId: string): Promise<void> {
   const session = await getSession(sessionId)
   if (!session) return
 
-  const newStory: Story = {
-    ...story,
-    id: Math.random().toString(36).substring(2, 9),
-    createdAt: new Date()
-  }
-
-  const updatedStories = [...session.stories, newStory]
-  
-  const sessionRef = doc(db, 'sessions', sessionId)
-  await updateDoc(sessionRef, {
-    stories: updatedStories.map(s => ({
-      ...s,
-      createdAt: Timestamp.fromDate(s.createdAt)
-    })),
-    updatedAt: serverTimestamp()
-  })
-}
-
-// Edit story in session
-export async function editStory(sessionId: string, storyId: string, updates: Partial<Pick<Story, 'title' | 'description'>>): Promise<void> {
-  const session = await getSession(sessionId)
-  if (!session) return
-
-  const updatedStories = session.stories.map(s => 
-    s.id === storyId ? { ...s, ...updates } : s
+  // Get current ready stories for the epic
+  const currentReadyStories = projectStories.filter(story => 
+    story.status === 'ready' && story.epicId === epicId
   )
-  
-  const sessionRef = doc(db, 'sessions', sessionId)
-  await updateDoc(sessionRef, {
-    stories: updatedStories.map(s => ({
-      ...s,
-      createdAt: Timestamp.fromDate(s.createdAt),
-      votingHistory: s.votingHistory?.map(round => ({
-        ...round,
-        timestamp: Timestamp.fromDate(round.timestamp)
-      })) || []
-    })),
-    updatedAt: serverTimestamp()
+
+  // Sync logic:
+  // 1. Add new ready stories that aren't in session
+  // 2. Remove session stories that are no longer ready or deleted
+  // 3. Update existing session stories with latest project data
+
+  // Stories to add (new ready stories)
+  const storiesToAdd = currentReadyStories.filter(projectStory => 
+    !session.stories.some(sessionStory => sessionStory.originalStoryId === projectStory.id)
+  )
+
+  // Stories to keep and update (existing session stories that are still ready)
+  const storiesToUpdate = session.stories.filter(sessionStory => 
+    currentReadyStories.some(projectStory => projectStory.id === sessionStory.originalStoryId)
+  ).map(sessionStory => {
+    const projectStory = currentReadyStories.find(ps => ps.id === sessionStory.originalStoryId)!
+    return {
+      ...sessionStory,
+      title: projectStory.title,
+      description: projectStory.description,
+      // Preserve session-specific data (votes, estimates, etc.)
+    }
   })
+
+  // Convert new stories to session format
+  const newSessionStories: SessionStory[] = storiesToAdd.map(story => ({
+    id: story.id,
+    title: story.title,
+    description: story.description,
+    estimate: null as string | null,
+    isEstimated: false,
+    createdAt: new Date(),
+    votingHistory: [],
+    originalStoryId: story.id
+  }))
+
+  // Final list: updated existing + new stories
+  const finalStories = [...storiesToUpdate, ...newSessionStories]
+
+  // Check if there are changes (story count, IDs, or content)
+  const hasChanges = finalStories.length !== session.stories.length ||
+    JSON.stringify(finalStories.map(s => s.originalStoryId).sort()) !== 
+    JSON.stringify(session.stories.map(s => s.originalStoryId).sort()) ||
+    finalStories.some(newStory => {
+      const oldStory = session.stories.find(s => s.originalStoryId === newStory.originalStoryId)
+      return !oldStory || 
+        oldStory.title !== newStory.title || 
+        oldStory.description !== newStory.description
+    })
+
+  if (hasChanges) {
+    
+    const sessionRef = doc(db, 'sessions', sessionId)
+    
+    // Check if current voting story was removed
+    const updateData: any = {
+      stories: finalStories.map(s => ({
+        ...s,
+        createdAt: s.createdAt instanceof Date ? Timestamp.fromDate(s.createdAt) : s.createdAt
+      })),
+      updatedAt: serverTimestamp()
+    }
+
+    // If the current voting story was removed, stop voting
+    if (session.currentStoryId && 
+        !finalStories.some(story => story.id === session.currentStoryId)) {
+      updateData.currentStoryId = null
+      updateData.votingInProgress = false
+      updateData.votesRevealed = false
+      // Clear all votes
+      updateData.participants = session.participants.map(p => ({
+        ...p,
+        vote: null,
+        lastSeen: p.lastSeen instanceof Date ? Timestamp.fromDate(p.lastSeen) : p.lastSeen
+      }))
+    }
+
+    await updateDoc(sessionRef, updateData)
+  }
 }
 
-// Delete story from session
-export async function deleteStory(sessionId: string, storyId: string): Promise<void> {
-  const session = await getSession(sessionId)
-  if (!session) return
-
-  const updatedStories = session.stories.filter(s => s.id !== storyId)
-  
-  const sessionRef = doc(db, 'sessions', sessionId)
-  
-  // If the story being deleted is currently being voted on, stop voting
-  const updateData: {
-    stories: unknown[]
-    updatedAt: unknown
-    currentStoryId?: null
-    votingInProgress?: boolean
-    votesRevealed?: boolean
-    participants?: unknown[]
-  } = {
-    stories: updatedStories.map(s => ({
-      ...s,
-      createdAt: Timestamp.fromDate(s.createdAt),
-      votingHistory: s.votingHistory?.map(round => ({
-        ...round,
-        timestamp: Timestamp.fromDate(round.timestamp)
-      })) || []
-    })),
-    updatedAt: serverTimestamp()
-  }
-  
-  if (session.currentStoryId === storyId) {
-    updateData.currentStoryId = null
-    updateData.votingInProgress = false
-    updateData.votesRevealed = false
-    // Clear all votes
-    updateData.participants = session.participants.map(p => ({
-      ...p,
-      vote: null,
-      lastSeen: Timestamp.fromDate(p.lastSeen)
-    }))
-  }
-  
-  await updateDoc(sessionRef, updateData)
+// Legacy function - kept for backward compatibility
+export async function importReadyStoriesIntoSession(sessionId: string, stories: Story[]): Promise<void> {
+  // This function is now just a wrapper around the sync function
+  if (stories.length === 0) return
+  const epicId = stories[0].epicId || ''
+  await syncSessionWithProjectStories(sessionId, stories, epicId)
 }
 
 // Start voting for a story
@@ -455,6 +470,7 @@ export async function endVoting(sessionId: string, finalEstimate?: string): Prom
     }
   }
 
+
   // Create voting round record
   const votingRound: {
     id: string
@@ -470,17 +486,19 @@ export async function endVoting(sessionId: string, finalEstimate?: string): Prom
     ...(calculatedEstimate && { finalEstimate: calculatedEstimate })
   }
 
-  // Update the story with voting history and final estimate
-  const updatedStories = session.stories.map(s => 
-    s.id === session.currentStoryId 
-      ? { 
-          ...s, 
-          ...(calculatedEstimate && { estimate: calculatedEstimate }),
-          isEstimated: !!calculatedEstimate,
-          votingHistory: [...(s.votingHistory || []), votingRound]
-        }
-      : s
-  )
+  // Update the story with voting history and final estimate (always update estimate for re-votes)
+  const updatedStories = session.stories.map(s => {
+    if (s.id === session.currentStoryId) {
+      const updatedStory = { 
+        ...s, 
+        estimate: calculatedEstimate || null, // Always update estimate, even if null
+        isEstimated: !!calculatedEstimate,
+        votingHistory: [...(s.votingHistory || []), votingRound]
+      }
+      return updatedStory
+    }
+    return s
+  })
 
   // Clear all participant votes
   const updatedParticipants = session.participants.map(p => ({

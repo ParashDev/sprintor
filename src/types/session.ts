@@ -7,7 +7,20 @@ export interface Participant {
   vote?: string | null
 }
 
-export interface Story {
+// NOTE: Story interface removed - sessions now use Story from @/types/story
+// Session stories are minimal representations for voting only:
+// { id, title, description, estimate, isEstimated, createdAt, votingHistory, originalStoryId }
+
+export interface VotingRound {
+  id: string
+  votes: { [participantId: string]: string }
+  participantNames: { [participantId: string]: string }
+  timestamp: Date
+  finalEstimate?: string
+}
+
+// Minimal story representation for voting sessions
+export interface SessionStory {
   id: string
   title: string
   description?: string
@@ -16,14 +29,6 @@ export interface Story {
   createdAt: Date
   votingHistory?: VotingRound[]
   originalStoryId?: string  // Reference to the project story this came from
-}
-
-export interface VotingRound {
-  id: string
-  votes: { [participantId: string]: string }
-  participantNames: { [participantId: string]: string }
-  timestamp: Date
-  finalEstimate?: string
 }
 
 export interface Session {
@@ -39,7 +44,7 @@ export interface Session {
   deckType: 'fibonacci' | 'tshirt' | 'powers' | 'custom'
   customDeck?: string[]
   participants: Participant[]
-  stories: Story[]
+  stories: SessionStory[]
   currentStoryId?: string | null
   votingInProgress: boolean
   votesRevealed: boolean
