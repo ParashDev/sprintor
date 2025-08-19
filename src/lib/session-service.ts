@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore'
 import { db } from './firebase'
 import type { Session, Participant, Story } from '@/types/session'
+import { updateStory } from './story-service'
 
 // Firestore document types for proper timestamp handling
 interface FirestoreDoc {
@@ -515,9 +516,25 @@ export async function endVoting(sessionId: string, finalEstimate?: string): Prom
 
 // End session (mark as inactive and all participants offline)
 export async function endSession(sessionId: string): Promise<void> {
-  console.log('Ending session:', sessionId)
   const session = await getSession(sessionId)
   if (!session) return
+
+  // Update all estimated stories from "ready" to "in_progress" in project collection
+  const estimatedStories = session.stories.filter(story => 
+    story.isEstimated && story.originalStoryId
+  )
+  
+  for (const sessionStory of estimatedStories) {
+    try {
+      await updateStory(sessionStory.originalStoryId!, {
+        status: 'in_progress',
+        updatedAt: new Date()
+      })
+    } catch (error) {
+      // Continue with other stories if one fails
+      console.error(`Failed to update story ${sessionStory.originalStoryId} status:`, error)
+    }
+  }
 
   // Mark all participants as offline
   const updatedParticipants = session.participants.map(p => ({
@@ -532,7 +549,6 @@ export async function endSession(sessionId: string): Promise<void> {
     participants: cleanParticipantsForFirestore(updatedParticipants),
     updatedAt: serverTimestamp()
   })
-  console.log('Session ended successfully, all participants marked offline')
 }
 
 // Update participant heartbeat

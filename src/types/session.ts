@@ -15,6 +15,7 @@ export interface Story {
   isEstimated: boolean
   createdAt: Date
   votingHistory?: VotingRound[]
+  originalStoryId?: string  // Reference to the project story this came from
 }
 
 export interface VotingRound {
@@ -31,6 +32,10 @@ export interface Session {
   description?: string
   hostId: string
   projectId?: string
+  projectName?: string      // Project name for display (stored to avoid permission issues)
+  epicId?: string           // Links session to specific epic
+  epicName?: string         // Display name for UI
+  epicColor?: string        // Epic color for visual identification
   deckType: 'fibonacci' | 'tshirt' | 'powers' | 'custom'
   customDeck?: string[]
   participants: Participant[]

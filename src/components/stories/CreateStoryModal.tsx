@@ -69,9 +69,10 @@ interface CreateStoryModalProps {
   isOpen: boolean
   onClose: () => void
   projectId: string
-  onStoryCreated: () => void
+  onStoryCreated: (storyData?: any) => void
   editingStory?: Story | null
   defaultEpicId?: string
+  sessionMode?: boolean // New prop to indicate session story creation
 }
 
 export default function CreateStoryModal({ 
@@ -80,7 +81,8 @@ export default function CreateStoryModal({
   projectId, 
   onStoryCreated,
   editingStory = null,
-  defaultEpicId
+  defaultEpicId,
+  sessionMode = false
 }: CreateStoryModalProps) {
   const [lockedProjectId, setLockedProjectId] = useState<string>('')
   const { user } = useAuth()
@@ -386,7 +388,7 @@ export default function CreateStoryModal({
           dependencyIds: [],
           blockedByIds: [],
           relatedStoryIds: [],
-          status: "backlog",
+          status: sessionMode ? "ready" : "backlog",
           blockers: [],
           reportedBy: user.uid,
           stakeholders: [],
@@ -482,9 +484,11 @@ export default function CreateStoryModal({
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 {isEditing
                   ? `Editing: ${editingStory?.title}`
-                  : currentStep === "template" 
-                    ? "Select a template or start from scratch"
-                    : selectedTemplate ? `Using: ${selectedTemplate.name}` : "Custom story"
+                  : sessionMode
+                    ? "Creating a story for the planning session"
+                    : currentStep === "template" 
+                      ? "Select a template or start from scratch"
+                      : selectedTemplate ? `Using: ${selectedTemplate.name}` : "Custom story"
                 }
               </p>
             </div>

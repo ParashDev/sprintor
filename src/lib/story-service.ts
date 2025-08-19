@@ -6,7 +6,6 @@ import {
   deleteDoc, 
   onSnapshot, 
   serverTimestamp,
-  Timestamp,
   query,
   collection,
   where,
@@ -14,10 +13,11 @@ import {
   limit,
   getDocs,
   writeBatch,
-  increment
+  increment,
+  type FieldValue
 } from 'firebase/firestore'
 import { db } from './firebase'
-import type { Story, Epic, StoryTemplate, AcceptanceCriterion, Blocker, Comment, Attachment } from '@/types/story'
+import type { Story, Epic, StoryTemplate,  Comment, Attachment } from '@/types/story'
 
 // Firestore document types for proper timestamp handling
 interface FirestoreStory extends Omit<Story, 'createdAt' | 'updatedAt' | 'startedAt' | 'completedAt' | 'lastDiscussion'> {
@@ -37,8 +37,8 @@ interface FirestoreTemplate extends Omit<StoryTemplate, 'createdAt' | 'lastUsed'
 function convertFirestoreStory(doc: FirestoreStory): Story {
   return {
     ...doc,
-    createdAt: doc.createdAt instanceof Date ? doc.createdAt : doc.createdAt.toDate(),
-    updatedAt: doc.updatedAt instanceof Date ? doc.updatedAt : doc.updatedAt.toDate(),
+    createdAt: doc.createdAt instanceof Date ? doc.createdAt : doc.createdAt?.toDate() || new Date(),
+    updatedAt: doc.updatedAt instanceof Date ? doc.updatedAt : doc.updatedAt?.toDate() || new Date(),
     startedAt: doc.startedAt instanceof Date ? doc.startedAt : doc.startedAt?.toDate() || undefined,
     completedAt: doc.completedAt instanceof Date ? doc.completedAt : doc.completedAt?.toDate() || undefined,
     lastDiscussion: doc.lastDiscussion instanceof Date ? doc.lastDiscussion : doc.lastDiscussion?.toDate() || undefined,
@@ -138,11 +138,11 @@ export async function incrementTemplateUsage(templateId: string): Promise<void> 
 
 // Create a new story
 // Helper function to clean undefined values from objects before Firestore write
-function cleanStoryDataForFirestore(data: Record<string, unknown>): Record<string, unknown> {
-  const cleanData: Record<string, unknown> = {}
+function cleanStoryDataForFirestore(data: Record<string, unknown>): Record<string, FieldValue | Partial<unknown> | undefined> {
+  const cleanData: Record<string, FieldValue | Partial<unknown> | undefined> = {}
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined) {
-      cleanData[key] = value
+      cleanData[key] = value as FieldValue | Partial<unknown>
     }
   })
   return cleanData

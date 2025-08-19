@@ -98,9 +98,8 @@ function PlanningContent() {
         setSelectedProject(project)
       }
     } else if (projects.length > 0 && !selectedProjectId) {
-      // Auto-select first project if none selected  
-      setSelectedProjectId(projects[0].id)
-      setSelectedProject(projects[0])
+      // Auto-select first project if none selected and update URL
+      handleProjectChange(projects[0].id)
     }
   }, [urlProjectId, projects, selectedProjectId])
 
@@ -458,7 +457,7 @@ function PlanningContent() {
                       Create your first session to get started with sprint planning
                     </p>
                     <Button asChild>
-                      <Link href="/create">
+                      <Link href={selectedProject ? `/create?project=${selectedProject.id}` : "/create"}>
                         <Plus className="mr-2 h-4 w-4" />
                         Create First Session
                       </Link>

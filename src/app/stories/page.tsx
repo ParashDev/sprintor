@@ -3,7 +3,7 @@
 import React, { useEffect, useState, Suspense, useCallback, useMemo } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
-import { getStoriesByProject, getProjectStoryStats, updateStory, deleteStory } from "@/lib/story-service"
+import { getStoriesByProject, getProjectStoryStats, updateStory, deleteStory, subscribeToProjectStories } from "@/lib/story-service"
 import { getProjectsByOwner } from "@/lib/project-service"
 import { getEpicsByProject, subscribeToProjectEpics } from "@/lib/epic-service"
 import type { Story } from "@/types/story"
@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { 
   Plus, 
   BookOpen, 
@@ -121,7 +120,7 @@ const StoryCardContent = React.memo(function StoryCardContent({
 }: {
   story: Story
   onEdit: (story: Story) => void
-  onDelete: (storyId: string) => void
+  onDelete: (story: Story) => void
   isDeleting: boolean
 }) {
   const getTypeIcon = useCallback((type: string) => {
@@ -165,42 +164,13 @@ const StoryCardContent = React.memo(function StoryCardContent({
               Edit
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <DropdownMenuItem 
-                  onSelect={(e) => e.preventDefault()}
-                  className="text-red-600 focus:text-red-600"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Story</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete &quot;{story.title}&quot;? This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => onDelete(story.id)}
-                    disabled={isDeleting}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
-                    {isDeleting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Deleting...
-                      </>
-                    ) : (
-                      'Delete'
-                    )}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <DropdownMenuItem 
+              onClick={() => onDelete(story)}
+              className="text-red-600 focus:text-red-600"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -232,7 +202,7 @@ const StoryCardContent = React.memo(function StoryCardContent({
 interface StoryCardProps {
   story: Story
   onEdit: (story: Story) => void
-  onDelete: (storyId: string) => void
+  onDelete: (story: Story) => void
   isDeleting: boolean
 }
 
@@ -277,7 +247,7 @@ interface DroppableColumnProps {
   column: typeof KANBAN_COLUMNS[0]
   stories: Story[]
   onEdit: (story: Story) => void
-  onDelete: (storyId: string) => void
+  onDelete: (story: Story) => void
   isDeleting: boolean
   deletingStoryId: string
 }
@@ -394,6 +364,8 @@ function StoriesContent() {
   const [editingStory, setEditingStory] = useState<Story | null>(null)
   const [deletingStoryId, setDeletingStoryId] = useState<string>('')
   const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [storyToDelete, setStoryToDelete] = useState<Story | null>(null)
 
   useEffect(() => {
     // Redirect to login if not authenticated
@@ -455,11 +427,26 @@ function StoriesContent() {
   }, [selectedProjectId, selectedProject, user, urlEpicId])
 
   useEffect(() => {
-    // Fetch stories when project is selected
+    // Subscribe to stories when project is selected for real-time updates
     if (selectedProjectId && selectedProject && user) {
-      fetchStoryData()
+      setLoadingStories(true)
+      const unsubscribe = subscribeToProjectStories(selectedProjectId, async (updatedStories) => {
+        setStories(updatedStories)
+        setLoadingStories(false)
+        
+        // Also update stats when stories change
+        try {
+          const stats = await getProjectStoryStats(selectedProjectId)
+          setStats(stats)
+        } catch (error) {
+          console.error('Error fetching stats:', error)
+        }
+      })
+      
+      return unsubscribe
     } else {
       setStories([])
+      setLoadingStories(false)
     }
   }, [selectedProjectId, selectedProject, user])
 
@@ -558,35 +545,42 @@ function StoriesContent() {
     handleCloseEditModal()
   }
 
-  const handleDeleteStory = async (storyId: string) => {
-    if (!user) return
+  const handleDeleteStoryClick = (story: Story) => {
+    setStoryToDelete(story)
+    setShowDeleteDialog(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!user || !storyToDelete) return
 
     setIsDeleting(true)
-    setDeletingStoryId(storyId)
+    setDeletingStoryId(storyToDelete.id)
     try {
-      await deleteStory(storyId)
+      await deleteStory(storyToDelete.id)
       
       // Refresh stories data
       if (selectedProjectId && selectedProject) {
         fetchStoryData()
       }
-      
-      // Reset UI state
-      setDeletingStoryId('')
-      setIsDeleting(false)
     } catch (error) {
       console.error('Error deleting story:', error)
-      // Reset UI state even on error
+    } finally {
+      // Always reset state - this ensures proper cleanup
       setDeletingStoryId('')
       setIsDeleting(false)
+      setShowDeleteDialog(false)
+      setStoryToDelete(null)
     }
-    
-    // Safety timeout to ensure state is always reset
-    setTimeout(() => {
-      setIsDeleting(false)
-      setDeletingStoryId('')
-    }, 100)
   }
+
+  const handleCancelDelete = () => {
+    // Explicit cancel handler to ensure clean state reset
+    setShowDeleteDialog(false)
+    setStoryToDelete(null)
+    setIsDeleting(false)
+    setDeletingStoryId('')
+  }
+
 
   // Separate async function to avoid blocking drag handler
   const updateStoryAsync = useCallback(async (storyId: string, newStatus: Story['status'], originalStatus: Story['status']) => {
@@ -721,7 +715,7 @@ function StoriesContent() {
       {mobileFilterOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="fixed inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setMobileFilterOpen(false)} />
-          <div className="fixed left-0 top-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-900 shadow-lg border-r">
+          <div className="fixed left-0 top-0 h-full w-80 max-w-[85vw] bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 shadow-lg border-r">
             <div className="h-full flex flex-col">
               {/* Mobile Sidebar Header */}
               <div className="p-4 border-b">
@@ -835,7 +829,7 @@ function StoriesContent() {
 
       <div className="flex">
         {/* Epic Sidebar - Desktop */}
-        <div className={`${desktopSidebarCollapsed ? 'w-14' : 'w-80'} hidden md:flex flex-shrink-0 border-r bg-white dark:bg-gray-900 transition-all duration-200`}>
+        <div className={`${desktopSidebarCollapsed ? 'w-14' : 'w-80'} hidden md:flex flex-shrink-0 border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-200`}>
           <div className="h-full flex flex-col w-full">
             {/* Sidebar Header */}
             <div className="p-4 border-b">
@@ -1140,7 +1134,7 @@ function StoriesContent() {
                   column={column}
                   stories={storiesByStatus[column.id] || []}
                   onEdit={handleEditStory}
-                  onDelete={handleDeleteStory}
+                  onDelete={handleDeleteStoryClick}
                   isDeleting={isDeleting}
                   deletingStoryId={deletingStoryId}
                 />
@@ -1187,6 +1181,57 @@ function StoriesContent() {
           onStoryCreated={handleStoryUpdated}
           editingStory={editingStory}
         />
+      )}
+
+      {/* Simple Custom Delete Modal - No portals, no Radix */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+            onClick={handleCancelDelete}
+          />
+          
+          {/* Modal */}
+          <div className="relative bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-md p-6 border">
+            <div className="space-y-4">
+              {/* Header */}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Delete Story
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Are you sure you want to delete "{storyToDelete?.title}"? This action cannot be undone.
+                </p>
+              </div>
+              
+              {/* Buttons */}
+              <div className="flex gap-3 justify-end pt-4">
+                <Button 
+                  variant="outline" 
+                  onClick={handleCancelDelete}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive"
+                  onClick={handleConfirmDelete}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

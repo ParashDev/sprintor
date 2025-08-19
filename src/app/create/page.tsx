@@ -7,9 +7,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, Settings, Loader2 } from "lucide-react"
+import { Users, Settings, Loader2, Target, Building2, AlertCircle } from "lucide-react"
 import { createSession } from "@/lib/session-service"
+import { getProjectsByOwner, type Project } from "@/lib/project-service"
+import { getEpicsByProject } from "@/lib/epic-service"
+import type { Epic } from "@/types/epic"
+import { getStoriesByProject } from "@/lib/story-service"
 import { useAuth } from "@/contexts/AuthContext"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { toast } from "sonner"
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader"
 
@@ -24,7 +30,8 @@ function CreateSessionContent() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const projectId = searchParams.get('project')
+  const urlProjectId = searchParams.get('project')
+  const urlEpicId = searchParams.get('epic')
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     sessionName: '',
@@ -32,6 +39,17 @@ function CreateSessionContent() {
     deckType: 'fibonacci' as 'fibonacci' | 'tshirt' | 'powers' | 'custom',
     customDeck: ''
   })
+  
+  // Project and Epic state
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+  const [epics, setEpics] = useState<Epic[]>([])
+  const [selectedEpicId, setSelectedEpicId] = useState<string>('')
+  const [selectedEpic, setSelectedEpic] = useState<Epic | null>(null)
+  const [loadingProjects, setLoadingProjects] = useState(true)
+  const [loadingEpics, setLoadingEpics] = useState(false)
+  const [readyStoriesCount, setReadyStoriesCount] = useState(0)
+  const [checkingStories, setCheckingStories] = useState(false)
 
   useEffect(() => {
     // Redirect to login if not authenticated
@@ -41,12 +59,137 @@ function CreateSessionContent() {
     }
   }, [user, loading, router])
 
+  // Fetch projects when user is available
+  useEffect(() => {
+    if (user && !loading) {
+      fetchProjects()
+    }
+  }, [user, loading])
+
+  // Initial project selection when projects load
+  useEffect(() => {
+    if (projects.length > 0 && !selectedProjectId) {
+      // Check URL parameter first
+      if (urlProjectId) {
+        const project = projects.find(p => p.id === urlProjectId)
+        if (project) {
+          setSelectedProjectId(urlProjectId)
+          return
+        }
+      }
+      // Otherwise select first project
+      setSelectedProjectId(projects[0].id)
+    }
+  }, [projects, urlProjectId])
+
+  // Fetch epics when project is selected
+  useEffect(() => {
+    if (selectedProjectId) {
+      fetchEpics(selectedProjectId)
+    }
+  }, [selectedProjectId])
+
+  // Handle URL epic parameter
+  useEffect(() => {
+    if (epics.length > 0 && urlEpicId && !selectedEpicId) {
+      const epic = epics.find(e => e.id === urlEpicId)
+      if (epic) {
+        setSelectedEpicId(urlEpicId)
+        setSelectedEpic(epic)
+      }
+    }
+  }, [epics, urlEpicId])
+
+  // Check for ready stories when epic is selected
+  useEffect(() => {
+    if (selectedEpicId && selectedProjectId) {
+      checkReadyStories()
+    }
+  }, [selectedEpicId, selectedProjectId])
+
+  const fetchProjects = async () => {
+    if (!user) return
+    
+    setLoadingProjects(true)
+    try {
+      const userProjects = await getProjectsByOwner(user.uid)
+      setProjects(userProjects)
+    } catch (error) {
+      console.error('Error fetching projects:', error)
+      toast.error('Failed to load projects')
+    } finally {
+      setLoadingProjects(false)
+    }
+  }
+
+  const fetchEpics = async (projectId: string) => {
+    setLoadingEpics(true)
+    setEpics([])
+    setSelectedEpicId('')
+    setSelectedEpic(null)
+    
+    try {
+      const projectEpics = await getEpicsByProject(projectId)
+      // Filter only active or planning epics
+      const availableEpics = projectEpics.filter(e => e.status !== 'completed')
+      setEpics(availableEpics)
+    } catch (error) {
+      console.error('Error fetching epics:', error)
+      toast.error('Failed to load epics')
+    } finally {
+      setLoadingEpics(false)
+    }
+  }
+
+  const checkReadyStories = async () => {
+    if (!selectedProjectId || !selectedEpicId) return
+    
+    setCheckingStories(true)
+    try {
+      const stories = await getStoriesByProject(selectedProjectId, {
+        epicId: selectedEpicId,
+        status: ['ready']
+      })
+      setReadyStoriesCount(stories.length)
+    } catch (error) {
+      console.error('Error checking ready stories:', error)
+      setReadyStoriesCount(0)
+    } finally {
+      setCheckingStories(false)
+    }
+  }
+
+  const handleProjectChange = (projectId: string) => {
+    setSelectedProjectId(projectId)
+    // Reset epic selection when project changes
+    setSelectedEpicId('')
+    setSelectedEpic(null)
+    setReadyStoriesCount(0)
+  }
+
+  const handleEpicChange = (epicId: string) => {
+    const epic = epics.find(e => e.id === epicId)
+    setSelectedEpicId(epicId)
+    setSelectedEpic(epic || null)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!user) {
       toast.error("Please sign in to host a session")
       router.push('/auth/login')
+      return
+    }
+
+    // Validate epic selection and ready stories
+    if (!selectedEpicId) {
+      toast.error("Please select an epic")
+      return
+    }
+
+    if (readyStoriesCount === 0) {
+      toast.error("No stories are ready for estimation. Please move stories to 'Ready' status first.")
       return
     }
 
@@ -67,6 +210,10 @@ function CreateSessionContent() {
         description: string
         hostId: string
         projectId?: string
+        projectName?: string
+        epicId?: string
+        epicName?: string
+        epicColor?: string
         deckType: 'fibonacci' | 'tshirt' | 'powers' | 'custom'
         customDeck?: string[]
         participants: Array<{
@@ -84,7 +231,11 @@ function CreateSessionContent() {
         name: formData.sessionName,
         description: formData.description,
         hostId: user.uid,
-        projectId: projectId || undefined,
+        projectId: selectedProjectId || undefined,
+        projectName: projects.find(p => p.id === selectedProjectId)?.name || undefined,
+        epicId: selectedEpicId || undefined,
+        epicName: selectedEpic?.name || undefined,
+        epicColor: selectedEpic?.color || undefined,
         deckType: formData.deckType,
         participants: [{
           id: user.uid,
@@ -175,6 +326,110 @@ function CreateSessionContent() {
                 <CardContent className="space-y-8">
                   <form onSubmit={handleSubmit} className="space-y-8">
                     <div className="grid gap-6">
+                      {/* Project and Epic Selection Section */}
+                      <div className="space-y-6 p-6 bg-background rounded-lg border-2 border-primary/20">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center">
+                            <Target className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-lg">Planning Scope</h3>
+                            <p className="text-sm text-muted-foreground">Select the epic for this planning session</p>
+                          </div>
+                        </div>
+                        
+                        {/* Selected Project Display */}
+                        {selectedProjectId && (
+                          <div className="p-4 bg-primary/5 rounded-lg border border-primary/20 mb-4">
+                            <div className="flex items-center gap-3">
+                              <Building2 className="h-5 w-5 text-primary" />
+                              <div>
+                                <div className="font-medium">Project: {projects.find(p => p.id === selectedProjectId)?.name}</div>
+                                <div className="text-sm text-muted-foreground">{projects.find(p => p.id === selectedProjectId)?.companyName}</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Epic Selector */}
+                        <div className="space-y-2">
+                          <Label htmlFor="epic" className="text-sm font-semibold flex items-center gap-2">
+                            <Target className="h-4 w-4" />
+                            Epic
+                          </Label>
+                          <Select 
+                            value={selectedEpicId} 
+                            onValueChange={handleEpicChange}
+                            disabled={!selectedProjectId || loadingEpics || epics.length === 0}
+                          >
+                            <SelectTrigger className="h-12 border-2">
+                              <SelectValue placeholder={
+                                !selectedProjectId ? "Loading project..." :
+                                loadingEpics ? "Loading epics..." :
+                                epics.length === 0 ? "No epics available" :
+                                "Select epic"
+                              } />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {epics.map((epic) => (
+                                <SelectItem key={epic.id} value={epic.id}>
+                                  <div className="flex items-center gap-3">
+                                    <div 
+                                      className="w-4 h-4 rounded"
+                                      style={{ backgroundColor: epic.color }}
+                                    />
+                                    <span>{epic.name}</span>
+                                    <span className="text-xs text-muted-foreground capitalize">• {epic.status}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {/* Ready Stories Alert */}
+                        {selectedEpicId && (
+                          <Alert className={readyStoriesCount === 0 ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/20' : 'border-green-500 bg-green-50 dark:bg-green-950/20'}>
+                            <AlertCircle className={`h-4 w-4 ${readyStoriesCount === 0 ? 'text-orange-600' : 'text-green-600'}`} />
+                            <AlertDescription className={readyStoriesCount === 0 ? 'text-orange-800 dark:text-orange-200' : 'text-green-800 dark:text-green-200'}>
+                              {checkingStories ? (
+                                <span className="flex items-center gap-2">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  Checking for ready stories...
+                                </span>
+                              ) : readyStoriesCount === 0 ? (
+                                <span>
+                                  <strong>No stories ready for estimation.</strong> Move stories to &quot;Ready&quot; status in the Stories page before creating a session.
+                                </span>
+                              ) : (
+                                <span>
+                                  <strong>{readyStoriesCount} {readyStoriesCount === 1 ? 'story' : 'stories'} ready</strong> for estimation in this epic.
+                                </span>
+                              )}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        
+                        {/* Epic Preview */}
+                        {selectedEpic && (
+                          <div className="p-4 bg-background rounded-lg border">
+                            <div className="flex items-center gap-3">
+                              <div 
+                                className="w-10 h-10 rounded-lg flex items-center justify-center text-lg"
+                                style={{ backgroundColor: selectedEpic.color + '20', color: selectedEpic.color }}
+                              >
+                                <Target className="h-5 w-5" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="font-medium">{selectedEpic.name}</div>
+                                <div className="text-sm text-muted-foreground line-clamp-1">{selectedEpic.description}</div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Session Details */}
                       <div className="space-y-3">
                         <Label htmlFor="session-name" className="text-sm font-semibold">Session Name</Label>
                         <Input
@@ -259,12 +514,22 @@ function CreateSessionContent() {
                       type="submit" 
                       size="lg"
                       className="w-full h-14 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200" 
-                      disabled={isLoading}
+                      disabled={isLoading || !selectedEpicId || readyStoriesCount === 0}
                     >
                       {isLoading ? (
                         <>
                           <Settings className="h-5 w-5 mr-3 animate-spin" />
                           Creating Session...
+                        </>
+                      ) : !selectedEpicId ? (
+                        <>
+                          <Target className="h-5 w-5 mr-3" />
+                          Select Epic to Continue
+                        </>
+                      ) : readyStoriesCount === 0 ? (
+                        <>
+                          <AlertCircle className="h-5 w-5 mr-3" />
+                          No Stories Ready for Estimation
                         </>
                       ) : (
                         <>
@@ -291,8 +556,17 @@ function CreateSessionContent() {
                         <div className="w-2 h-2 rounded-full bg-primary"></div>
                       </div>
                       <div className="text-sm">
+                        <div className="font-medium">Ready stories imported</div>
+                        <div className="text-muted-foreground">All &quot;Ready&quot; stories from your epic will be loaded</div>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <div className="w-2 h-2 rounded-full bg-slate-500"></div>
+                      </div>
+                      <div className="text-sm">
                         <div className="font-medium">Get your room code</div>
-                        <div className="text-muted-foreground">You&rsquo;ll receive a 6-character code to share</div>
+                        <div className="text-muted-foreground">Share the 6-character code with your team</div>
                       </div>
                     </div>
                     <div className="flex gap-3">
@@ -300,7 +574,7 @@ function CreateSessionContent() {
                         <div className="w-2 h-2 rounded-full bg-slate-400"></div>
                       </div>
                       <div className="text-sm">
-                        <div className="font-medium text-muted-foreground">Invite your team</div>
+                        <div className="font-medium">Invite your team</div>
                         <div className="text-muted-foreground">Share the room code with participants</div>
                       </div>
                     </div>
@@ -309,8 +583,8 @@ function CreateSessionContent() {
                         <div className="w-2 h-2 rounded-full bg-slate-400"></div>
                       </div>
                       <div className="text-sm">
-                        <div className="font-medium text-muted-foreground">Start estimating</div>
-                        <div className="text-muted-foreground">Add stories and begin planning poker</div>
+                        <div className="font-medium">Start estimating</div>
+                        <div className="text-muted-foreground">Begin voting on imported stories</div>
                       </div>
                     </div>
                   </div>
@@ -323,9 +597,9 @@ function CreateSessionContent() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="text-sm space-y-2">
-                    <p>• Keep session names descriptive</p>
+                    <p>• Move stories to &quot;Ready&quot; status before planning</p>
                     <p>• Fibonacci sequence works for most teams</p>
-                    <p>• Prepare your user stories in advance</p>
+                    <p>• One epic per session works best</p>
                     <p>• Encourage discussion before revealing votes</p>
                   </div>
                 </CardContent>

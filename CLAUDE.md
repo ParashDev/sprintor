@@ -17,9 +17,9 @@ This file provides comprehensive guidance to Claude Code when working with the S
 
 Sprintor is a real-time collaborative planning poker application built with Next.js 15.4.6, Firebase/Firestore, and shadcn/ui components. It enables distributed teams to conduct sprint planning sessions with real-time voting, session management, and participant tracking.
 
-**🎯 Current Architecture: Project-Centric Planning**
+**🎯 Current Architecture: Agile Hierarchy**
 ```
-User → Projects → Planning Sessions (project-scoped) → Stories
+User → Projects → Epics → Stories → Planning Sessions
 ```
 
 ### Current Architecture Stack
@@ -52,7 +52,18 @@ npm run lint            # Run ESLint checks (required to pass before deployment)
 - ✅ **Project-Specific Stats**: Dashboard metrics calculated per project, not globally
 - ✅ **Seamless Project Switching**: Instant session filtering when changing projects
 
-### 📖 Story Management System (NEW)
+### 🏔️ Epic Management System (COMPLETED)
+- ✅ **Epic Creation**: Create epics with name, description, color, icon, and acceptance criteria
+- ✅ **Epic Management Page**: Grid layout showing all epics with statistics and progress
+- ✅ **Epic-Story Linking**: Stories can be assigned to epics with real-time count updates
+- ✅ **Epic Filtering**: Filter stories by epic in the Stories page sidebar
+- ✅ **Epic Status Workflow**: Planning → Active → Completed status management
+- ✅ **Acceptance Criteria**: Define and track epic-level acceptance criteria
+- ✅ **Visual Customization**: Color coding and icon selection for epic identification
+- ✅ **Real-time Statistics**: Live story count breakdown by status (backlog, ready, in progress, review, testing, done)
+- ✅ **Mobile Responsive**: Collapsible sidebar on desktop, overlay drawer on mobile
+
+### 📖 Story Management System
 - ✅ **Story Creation**: Advanced story creation with templates and detailed forms
 - ✅ **Story Templates**: Pre-built templates for features, bugs, technical stories, etc.
 - ✅ **Template Categories**: Organized by feature, bug, technical, research, epic types
@@ -109,7 +120,8 @@ src/app/
 │   └── signup/page.tsx     # User registration page
 ├── projects/page.tsx        # Project management dashboard
 ├── planning/page.tsx        # Planning sessions page (project-scoped)
-├── stories/page.tsx         # Story management and creation page (NEW)
+├── epics/page.tsx           # Epic management dashboard
+├── stories/page.tsx         # Story management with epic filtering
 ├── create/page.tsx          # Session creation form with deck selection
 ├── join/page.tsx           # Session joining with room code input
 └── session/[id]/page.tsx   # Main session interface with voting
@@ -128,9 +140,11 @@ src/components/
 │   ├── SessionHeader.tsx          # Session controls, theme toggle, leave/end
 │   ├── SessionReconnectModal.tsx  # Reconnection prompt for refreshes
 │   └── SessionEndedDialog.tsx     # Dialog when host ends session
+├── epics/
+│   └── CreateEpicModal.tsx        # Epic creation/edit modal with acceptance criteria
 ├── stories/
-│   ├── CreateStoryModal.tsx       # High-performance story creation modal (NEW)
-│   └── FormField.tsx              # Reusable form field component (NEW)
+│   ├── CreateStoryModal.tsx       # Story creation with epic selection
+│   └── FormField.tsx              # Reusable form field component
 └── CreateProjectModal.tsx # High-performance project creation modal
 ```
 
@@ -140,12 +154,14 @@ src/lib/
 ├── firebase.ts            # Firebase configuration and initialization
 ├── session-service.ts     # All Firestore operations and session management
 ├── project-service.ts     # Project CRUD operations and Firebase integration
-├── story-service.ts       # Story CRUD operations and template management (NEW)
+├── story-service.ts       # Story CRUD operations and template management
+├── epic-service.ts        # Epic CRUD operations and real-time subscriptions
 └── utils.ts              # Utility functions
 
 src/types/
 ├── session.ts            # TypeScript interfaces for Session, Participant, Story
-└── story.ts              # TypeScript interfaces for Story, StoryTemplate, etc. (NEW)
+├── story.ts              # TypeScript interfaces for Story, StoryTemplate, etc.
+└── epic.ts               # TypeScript interfaces for Epic, EpicStats
 
 src/contexts/
 └── AuthContext.tsx       # Firebase Auth context and user management
@@ -180,7 +196,7 @@ interface Session {
 }
 ```
 
-### Project Interface (NEW)
+### Project Interface
 ```typescript
 interface Project {
   id: string
@@ -197,6 +213,27 @@ interface Project {
 }
 ```
 
+### Epic Interface
+```typescript
+interface Epic {
+  id: string
+  name: string
+  description: string
+  projectId: string
+  color: string              // Hex color for visual identification
+  icon?: string              // Optional Lucide icon name
+  status: 'planning' | 'active' | 'completed'
+  acceptanceCriteria: string[]
+  storyCount: number
+  completedStoryCount: number
+  createdAt: Date
+  updatedAt: Date
+  targetDate?: Date
+  ownerId: string
+  order?: number
+}
+```
+
 ### Participant Interface
 ```typescript
 interface Participant {
@@ -209,16 +246,32 @@ interface Participant {
 }
 ```
 
-### Story Interface
+### Story Interface (Extended)
 ```typescript
 interface Story {
   id: string
   title: string
-  description?: string
-  estimate?: string | null
-  isEstimated: boolean
+  description: string
+  projectId: string
+  epicId?: string              // Links story to epic
+  type: 'story' | 'bug' | 'task' | 'spike' | 'epic'
+  status: 'backlog' | 'ready' | 'in_progress' | 'review' | 'testing' | 'done'
+  priority: 'Must Have' | 'Should Have' | 'Could Have' | 'Won\'t Have'
+  storyPoints?: number
+  businessValue?: 'high' | 'medium' | 'low'
+  risk?: 'high' | 'medium' | 'low'
+  asA?: string                 // User story format
+  iWant?: string
+  soThat?: string
+  acceptanceCriteria: AcceptanceCriterion[]
+  labels: string[]
   createdAt: Date
-  votingHistory?: VotingRound[]
+  updatedAt: Date
+  startedAt?: Date
+  completedAt?: Date
+  assignedTo?: string
+  createdBy: string
+  createdFromTemplate?: string
 }
 ```
 
@@ -289,7 +342,7 @@ sessions/{sessionId} = {
 }
 ```
 
-### Projects Collection (NEW)
+### Projects Collection
 ```
 projects/{projectId} = {
   id: string
@@ -306,46 +359,57 @@ projects/{projectId} = {
 }
 ```
 
-### Stories Collection (NEW)
+### Epics Collection
+```
+epics/{epicId} = {
+  id: string
+  name: string
+  description: string
+  projectId: string           // Links to projects collection
+  color: string               // Hex color code
+  icon?: string               // Lucide icon name
+  status: 'planning' | 'active' | 'completed'
+  acceptanceCriteria: string[]
+  storyCount: number
+  completedStoryCount: number
+  createdAt: Timestamp
+  updatedAt: Timestamp
+  targetDate?: Timestamp
+  ownerId: string
+  order?: number
+}
+```
+
+### Stories Collection
 ```
 stories/{storyId} = {
   id: string
   title: string
   description: string
-  type: 'story' | 'epic' | 'task' | 'bug' | 'spike'
-  status: 'backlog' | 'ready' | 'in_progress' | 'review' | 'testing' | 'done'
-  priority: 'Must Have' | 'Should Have' | 'Could Have' | 'Won\'t Have'
-  businessValue: number (1-10)
-  riskLevel: 'Low' | 'Medium' | 'High' | 'Critical'
-  complexity: 'Simple' | 'Moderate' | 'Complex' | 'Epic'
+  projectId: string           // Links to projects collection
+  epicId?: string             // Links to epics collection
+  type: string
+  status: string
+  priority: string
   storyPoints?: number
-  timeEstimate?: string
-  estimationConfidence: 'Low' | 'Medium' | 'High'
+  businessValue?: string
+  risk?: string
+  asA?: string
+  iWant?: string
+  soThat?: string
   acceptanceCriteria: Array<{
     id: string
-    description: string
-    type: 'checklist'
-    isCompleted: boolean
-    testable: boolean
-    priority: 'must' | 'should' | 'could'
+    criterion: string
+    completed: boolean
   }>
   labels: string[]
-  projectId: string
   createdAt: Timestamp
   updatedAt: Timestamp
-  reportedBy: string
-  
-  // 🎯 NEW: Planning Session Integration Fields (TO BE IMPLEMENTED)
-  isEstimated: boolean                    // Has this story been estimated in planning?
-  estimatedInSession?: string             // Session ID where it was estimated
-  estimationDate?: Timestamp              // When estimation was completed
-  votingHistory?: Array<{                 // Estimation voting history from sessions
-    sessionId: string
-    votes: Record<string, string>
-    participantNames: Record<string, string>
-    timestamp: Timestamp
-    finalEstimate?: string
-  }>
+  startedAt?: Timestamp
+  completedAt?: Timestamp
+  assignedTo?: string
+  createdBy: string
+  createdFromTemplate?: string
 }
 ```
 
