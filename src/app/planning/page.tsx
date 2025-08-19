@@ -71,7 +71,9 @@ function PlanningContent() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [stats, setStats] = useState({
     totalSessions: 0,
-    storiesEstimated: 0,
+    storiesInPlanning: 0,
+    storiesSprintReady: 0,
+    totalStories: 0,
     teamMembers: 0,
     avgEstimationTime: '--'
   })
@@ -158,7 +160,6 @@ function PlanningContent() {
       setSessions([])
       setStats({
         totalSessions: 0,
-        storiesEstimated: 0,
         storiesInPlanning: 0,
         storiesSprintReady: 0,
         totalStories: 0,
@@ -238,7 +239,6 @@ function PlanningContent() {
       
       // Calculate stats
       const totalSessions = relevantSessions.length
-      const storiesEstimated = stories.filter(s => s.storyPoints && s.storyPoints > 0).length
       const storiesInPlanning = stories.filter(s => s.status === 'planning').length
       const storiesSprintReady = stories.filter(s => s.status === 'sprint_ready').length
       
@@ -250,7 +250,6 @@ function PlanningContent() {
       
       return {
         totalSessions,
-        storiesEstimated,
         storiesInPlanning,
         storiesSprintReady,
         totalStories: stories.length,
@@ -261,7 +260,6 @@ function PlanningContent() {
       console.error('Error calculating epic stats:', error)
       return {
         totalSessions: 0,
-        storiesEstimated: 0,
         storiesInPlanning: 0,
         storiesSprintReady: 0,
         totalStories: 0,
