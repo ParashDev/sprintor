@@ -209,17 +209,68 @@ export function subscribeToProjectEpics(projectId: string, callback: (epics: Epi
   }
 }
 
-// Get epic statistics
+// Get epic statistics (public wrapper for the internal function)
 export async function getEpicStats(epicId: string): Promise<EpicStats> {
   try {
-    // This will be implemented when we integrate with stories
-    // For now, return default stats
-    const q = query(
-      collection(db, 'stories'),
-      where('epicId', '==', epicId)
-    )
+    const epic = await getEpic(epicId)
+    if (!epic) {
+      throw new Error('Epic not found')
+    }
     
-    const querySnapshot = await getDocs(q)
+    return await getEpicStatsFromStories(epicId, epic.projectId)
+  } catch (error) {
+    console.error('Error fetching epic stats:', error)
+    return {
+      totalStories: 0,
+      completedStories: 0,
+      inProgressStories: 0,
+      backlogStories: 0,
+      completionPercentage: 0,
+      totalStoryPoints: 0,
+      completedStoryPoints: 0,
+      averageStoryPoints: 0
+    }
+  }
+}
+
+// Determine epic status based on story statuses
+function determineEpicStatus(
+  totalStories: number,
+  backlogStories: number,
+  inProgressStories: number,
+  completedStories: number
+): 'planning' | 'active' | 'completed' {
+  // If no stories, it's in planning
+  if (totalStories === 0) {
+    return 'planning'
+  }
+  
+  // If epic has only backlog stories, it's in planning
+  if (backlogStories === totalStories) {
+    return 'planning'
+  }
+  
+  // Any epic with stories in planning or sprint_ready is active
+  // (We don't have sprint cycles yet, so sprint_ready stories are still "active work")
+  if (inProgressStories > 0 || completedStories > 0) {
+    return 'active'
+  }
+  
+  // Default fallback to planning
+  return 'planning'
+}
+
+// Get epic statistics using story service to avoid permission issues
+async function getEpicStatsFromStories(epicId: string, projectId: string): Promise<EpicStats> {
+  try {
+    // Import story service dynamically to avoid circular imports
+    const { getStoriesByProject } = await import('./story-service')
+    
+    // Get all stories for this epic
+    const stories = await getStoriesByProject(projectId, {
+      epicId: epicId
+    })
+    
     let totalStories = 0
     let completedStories = 0
     let inProgressStories = 0
@@ -227,8 +278,7 @@ export async function getEpicStats(epicId: string): Promise<EpicStats> {
     let totalStoryPoints = 0
     let completedStoryPoints = 0
     
-    querySnapshot.forEach((doc) => {
-      const story = doc.data()
+    stories.forEach((story) => {
       totalStories++
       
       switch (story.status) {
@@ -262,7 +312,7 @@ export async function getEpicStats(epicId: string): Promise<EpicStats> {
       averageStoryPoints: totalStories > 0 ? totalStoryPoints / totalStories : 0
     }
   } catch (error) {
-    console.error('Error fetching epic stats:', error)
+    console.error('Error fetching epic stats from stories:', error)
     return {
       totalStories: 0,
       completedStories: 0,
@@ -276,15 +326,45 @@ export async function getEpicStats(epicId: string): Promise<EpicStats> {
   }
 }
 
-// Update epic story counts (called when stories are added/removed/updated)
 export async function updateEpicStoryCounts(epicId: string): Promise<void> {
   try {
-    const stats = await getEpicStats(epicId)
+    // Get the epic to find its project
+    const epic = await getEpic(epicId)
+    if (!epic) {
+      console.error('Epic not found:', epicId)
+      return
+    }
+    
+    const stats = await getEpicStatsFromStories(epicId, epic.projectId)
+    
+    // Determine automatic status based on story statuses
+    const autoStatus = determineEpicStatus(
+      stats.totalStories,
+      stats.backlogStories,
+      stats.inProgressStories,
+      stats.completedStories
+    )
+    
     await updateEpic(epicId, {
       storyCount: stats.totalStories,
-      completedStoryCount: stats.completedStories
+      completedStoryCount: stats.completedStories,
+      status: autoStatus
     })
   } catch (error) {
     console.error('Error updating epic story counts:', error)
+  }
+}
+
+// Sync all epics in a project to have correct automatic statuses
+export async function syncAllEpicStatuses(projectId: string): Promise<void> {
+  try {
+    const epics = await getEpicsByProject(projectId)
+    
+    // Update each epic's status based on its stories
+    for (const epic of epics) {
+      await updateEpicStoryCounts(epic.id)
+    }
+  } catch (error) {
+    console.error('Error syncing epic statuses:', error)
   }
 }

@@ -3,7 +3,7 @@
 import React, { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
-import { deleteEpic, updateEpic, subscribeToProjectEpics } from "@/lib/epic-service"
+import { deleteEpic, updateEpic, subscribeToProjectEpics, syncAllEpicStatuses } from "@/lib/epic-service"
 import { getProjectsByOwner, type Project } from "@/lib/project-service"
 import { getStoriesByProject } from "@/lib/story-service"
 import type { Epic } from "@/types/epic"
@@ -184,14 +184,27 @@ function EpicsPageContent() {
     // Subscribe to epics when project is selected
     if (selectedProjectId && selectedProject && user) {
       setLoadingEpics(true)
-      const unsubscribe = subscribeToProjectEpics(selectedProjectId, (updatedEpics) => {
-        setEpics(updatedEpics)
+      
+      let unsubscribe: (() => void) | null = null
+      
+      // First sync all epic statuses to ensure they're up-to-date
+      syncAllEpicStatuses(selectedProjectId).then(() => {
+        unsubscribe = subscribeToProjectEpics(selectedProjectId, (updatedEpics) => {
+          setEpics(updatedEpics)
+          setLoadingEpics(false)
+          // Calculate story counts after epics are loaded
+          calculateEpicStoryCounts(selectedProjectId)
+        })
+      }).catch(error => {
+        console.error('Error syncing epic statuses:', error)
         setLoadingEpics(false)
-        // Calculate story counts after epics are loaded
-        calculateEpicStoryCounts(selectedProjectId)
       })
       
-      return () => unsubscribe()
+      return () => {
+        if (unsubscribe) {
+          unsubscribe()
+        }
+      }
     } else {
       setEpics([])
       setEpicStoryCounts({})
@@ -231,14 +244,6 @@ function EpicsPageContent() {
   const handleEditEpic = (epic: Epic) => {
     setEditingEpic(epic)
     setIsCreateModalOpen(true)
-  }
-
-  const handleStatusChange = async (epicId: string, newStatus: Epic['status']) => {
-    try {
-      await updateEpic(epicId, { status: newStatus })
-    } catch (error) {
-      console.error('Error updating epic status:', error)
-    }
   }
 
   const handleDeleteEpic = (epic: Epic) => {
@@ -371,43 +376,47 @@ function EpicsPageContent() {
             <CardContent>
               <div className="text-2xl font-bold">{epics.length}</div>
               <p className="text-xs text-muted-foreground">
-                {epics.length === 0 ? "No epics yet" : "Active epics"}
+                {epics.length === 0 ? "No epics yet" : "Project epics"}
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{epics.filter(e => e.status === 'completed').length}</div>
-              <p className="text-xs text-muted-foreground">
-                {epics.length === 0 ? "Start creating epics" : "Finished epics"}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active</CardTitle>
+              <CardTitle className="text-sm font-medium">Active Epics</CardTitle>
               <Target className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{epics.filter(e => e.status === 'active').length}</div>
               <p className="text-xs text-muted-foreground">
-                {epics.length === 0 ? "Start working" : "Epics in progress"}
+                {epics.length === 0 ? "No epics yet" : "Currently active"}
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Planning</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Stories</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {Object.values(epicStoryCounts).reduce((total, counts) => total + counts.total, 0)}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Across all epics
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">In Planning</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{epics.filter(e => e.status === 'planning').length}</div>
+              <div className="text-2xl font-bold">
+                {Object.values(epicStoryCounts).reduce((total, counts) => total + counts.planning, 0)}
+              </div>
               <p className="text-xs text-muted-foreground">
-                {epics.length === 0 ? "Start planning" : "Epics being planned"}
+                Stories ready for estimation
               </p>
             </CardContent>
           </Card>
@@ -474,27 +483,6 @@ function EpicsPageContent() {
                             View Stories
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        
-                        {/* Status Change Options */}
-                        {epic.status !== 'planning' && (
-                          <DropdownMenuItem onClick={() => handleStatusChange(epic.id, 'planning')}>
-                            <Clock className="mr-2 h-4 w-4" />
-                            Mark as Planning
-                          </DropdownMenuItem>
-                        )}
-                        {epic.status !== 'active' && (
-                          <DropdownMenuItem onClick={() => handleStatusChange(epic.id, 'active')}>
-                            <Target className="mr-2 h-4 w-4" />
-                            Mark as Active
-                          </DropdownMenuItem>
-                        )}
-                        {epic.status !== 'completed' && (
-                          <DropdownMenuItem onClick={() => handleStatusChange(epic.id, 'completed')}>
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                            Mark as Completed
-                          </DropdownMenuItem>
-                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
                           onClick={() => handleDeleteEpic(epic)}

@@ -18,6 +18,7 @@ import {
 } from 'firebase/firestore'
 import { db } from './firebase'
 import type { Story, Epic, StoryTemplate,  Comment, Attachment } from '@/types/story'
+import { updateEpicStoryCounts } from './epic-service'
 
 // Firestore document types for proper timestamp handling
 interface FirestoreStory extends Omit<Story, 'createdAt' | 'updatedAt' | 'startedAt' | 'completedAt' | 'lastDiscussion'> {
@@ -167,6 +168,11 @@ export async function createStory(storyData: Omit<Story, 'id' | 'createdAt' | 'u
     
     await setDoc(doc(db, 'stories', storyId), cleanData)
 
+    // Update epic status if story belongs to an epic
+    if (storyData.epicId) {
+      await updateEpicStoryCounts(storyData.epicId)
+    }
+
     return storyId
   } catch (error) {
     console.error('Error creating story:', error)
@@ -250,6 +256,9 @@ export async function getStory(storyId: string): Promise<Story | null> {
 // Update a story
 export async function updateStory(storyId: string, updates: Partial<Omit<Story, 'id' | 'createdAt'>>): Promise<void> {
   try {
+    // Get the current story to check for epic changes
+    const currentStory = await getStory(storyId)
+    
     const storyRef = doc(db, 'stories', storyId)
     
     // Clean undefined values before writing to Firestore
@@ -259,6 +268,24 @@ export async function updateStory(storyId: string, updates: Partial<Omit<Story, 
     })
     
     await updateDoc(storyRef, cleanUpdates)
+    
+    // Update epic status for affected epics
+    const epicsToUpdate = new Set<string>()
+    
+    // Add current epic if it exists
+    if (currentStory?.epicId) {
+      epicsToUpdate.add(currentStory.epicId)
+    }
+    
+    // Add new epic if it's changing
+    if (updates.epicId && updates.epicId !== currentStory?.epicId) {
+      epicsToUpdate.add(updates.epicId)
+    }
+    
+    // Update all affected epics
+    for (const epicId of epicsToUpdate) {
+      await updateEpicStoryCounts(epicId)
+    }
   } catch (error) {
     console.error('Error updating story:', error)
     throw new Error('Failed to update story')
@@ -268,8 +295,16 @@ export async function updateStory(storyId: string, updates: Partial<Omit<Story, 
 // Delete a story
 export async function deleteStory(storyId: string): Promise<void> {
   try {
+    // Get the story before deleting to update epic status
+    const story = await getStory(storyId)
+    
     const storyRef = doc(db, 'stories', storyId)
     await deleteDoc(storyRef)
+    
+    // Update epic status if story belonged to an epic
+    if (story?.epicId) {
+      await updateEpicStoryCounts(story.epicId)
+    }
   } catch (error) {
     console.error('Error deleting story:', error)
     throw new Error('Failed to delete story')

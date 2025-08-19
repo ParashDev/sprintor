@@ -688,6 +688,56 @@ function StoriesContent() {
     return grouped
   }, [stories, searchQuery, selectedEpicId])
 
+  // Calculate stats based on filtered stories (epic-specific when epic is selected)
+  const filteredStats = useMemo(() => {
+    let filteredStories = stories
+    
+    // Apply epic filter if selected
+    if (selectedEpicId) {
+      filteredStories = stories.filter(story => story.epicId === selectedEpicId)
+    }
+    
+    // Calculate stats from filtered stories
+    const totalStories = filteredStories.length
+    const storiesByStatus: Record<string, number> = {
+      backlog: 0,
+      planning: 0,
+      sprint_ready: 0
+    }
+    
+    let totalStoryPoints = 0
+    let storiesWithPoints = 0
+    let completedStories = 0
+    
+    filteredStories.forEach(story => {
+      // Count by status
+      if (storiesByStatus[story.status] !== undefined) {
+        storiesByStatus[story.status]++
+      }
+      
+      // Calculate story points average
+      if (story.storyPoints) {
+        totalStoryPoints += story.storyPoints
+        storiesWithPoints++
+      }
+      
+      // Count completed stories (sprint ready)
+      if (story.status === 'sprint_ready') {
+        completedStories++
+      }
+    })
+    
+    const completionRate = totalStories > 0 ? (completedStories / totalStories) * 100 : 0
+    const averageStoryPoints = storiesWithPoints > 0 ? totalStoryPoints / storiesWithPoints : 0
+    
+    return {
+      totalStories,
+      storiesByStatus,
+      completionRate,
+      averageStoryPoints
+    }
+  }, [stories, selectedEpicId])
+
   if (loading || loadingProjects) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -818,7 +868,7 @@ function StoriesContent() {
                 <BookOpen className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.totalStories}</div>
+                <div className="text-2xl font-bold">{filteredStats.totalStories}</div>
                 <p className="text-xs text-muted-foreground">Stories</p>
               </CardContent>
             </Card>
@@ -828,7 +878,7 @@ function StoriesContent() {
                 <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{Math.round(stats.completionRate)}%</div>
+                <div className="text-2xl font-bold">{Math.round(filteredStats.completionRate)}%</div>
                 <p className="text-xs text-muted-foreground">Complete</p>
               </CardContent>
             </Card>
@@ -838,7 +888,7 @@ function StoriesContent() {
                 <Target className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.averageStoryPoints.toFixed(1)}</div>
+                <div className="text-2xl font-bold">{filteredStats.averageStoryPoints.toFixed(1)}</div>
                 <p className="text-xs text-muted-foreground">Story size</p>
               </CardContent>
             </Card>
@@ -848,7 +898,7 @@ function StoriesContent() {
                 <Clock className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.storiesByStatus?.sprint_ready || 0}</div>
+                <div className="text-2xl font-bold">{filteredStats.storiesByStatus?.sprint_ready || 0}</div>
                 <p className="text-xs text-muted-foreground">Ready for Sprint</p>
               </CardContent>
             </Card>
