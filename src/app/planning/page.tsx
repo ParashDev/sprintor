@@ -195,12 +195,9 @@ function PlanningContent() {
       // Filter sessions by epic if one is selected
       let filteredSessions = projectSessions
       if (selectedEpicId && selectedEpicId !== 'all') {
-        // Sessions that are associated with the selected epic
+        // Sessions that are directly associated with the selected epic
         filteredSessions = projectSessions.filter(session => 
-          // Show session if it's directly associated with the selected epic
-          session.epicId === selectedEpicId ||
-          // Show session if it has stories from the selected epic
-          session.stories.some(story => story.epicId === selectedEpicId)
+          session.epicId === selectedEpicId
         )
       }
       
@@ -226,14 +223,11 @@ function PlanningContent() {
       // Get all sessions for the project
       const allSessions = await getSessionsByProject(user!.uid, projectId)
       
-      // Filter sessions that include stories from this epic
+      // Filter sessions that are associated with this epic
       let relevantSessions = allSessions
       if (epicId && epicId !== 'all') {
         relevantSessions = allSessions.filter(session => 
-          // Show session if it's directly associated with the selected epic
-          session.epicId === epicId ||
-          // Show session if it has stories from the selected epic
-          session.stories.some(story => story.epicId === epicId)
+          session.epicId === epicId
         )
       }
       
