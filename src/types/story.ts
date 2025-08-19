@@ -102,8 +102,8 @@ export interface Story {
   blockedByIds: string[]
   relatedStoryIds: string[]
   
-  // Status & Workflow
-  status: 'backlog' | 'ready' | 'in_progress' | 'review' | 'testing' | 'done' | 'rejected'
+  // Status & Workflow - Simplified for story preparation workflow
+  status: 'backlog' | 'planning' | 'sprint_ready'
   workflowStatus?: string
   blockers: Blocker[]
   

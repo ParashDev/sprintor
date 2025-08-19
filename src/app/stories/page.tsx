@@ -29,9 +29,6 @@ import {
   Trash2,
   MoreHorizontal,
   GripVertical,
-  ChevronLeft,
-  ChevronRight,
-  Filter,
   X,
   Rocket,
   Zap,
@@ -101,14 +98,11 @@ interface Project {
   companyName: string
 }
 
-// Kanban columns configuration
+// Kanban columns configuration - Simplified for story preparation workflow
 const KANBAN_COLUMNS = [
   { id: 'backlog', title: 'Backlog', color: 'bg-gray-100 dark:bg-gray-800' },
-  { id: 'ready', title: 'Ready', color: 'bg-blue-100 dark:bg-blue-900/20' },
-  { id: 'in_progress', title: 'In Progress', color: 'bg-yellow-100 dark:bg-yellow-900/20' },
-  { id: 'review', title: 'Review', color: 'bg-purple-100 dark:bg-purple-900/20' },
-  { id: 'testing', title: 'Testing', color: 'bg-orange-100 dark:bg-orange-900/20' },
-  { id: 'done', title: 'Done', color: 'bg-green-100 dark:bg-green-900/20' }
+  { id: 'planning', title: 'Planning', color: 'bg-blue-100 dark:bg-blue-900/20' },
+  { id: 'sprint_ready', title: 'Sprint Ready', color: 'bg-green-100 dark:bg-green-900/20' }
 ]
 
 // Memoized content component (prevents re-renders during drag)
@@ -258,7 +252,7 @@ const DroppableColumn = React.memo(function DroppableColumn({ column, stories, o
   })
 
   return (
-    <div className="flex-shrink-0 w-full md:w-80">
+    <div className="w-full">
       <Card className="h-full">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -323,8 +317,6 @@ function StoriesContent() {
   const [epics, setEpics] = useState<Epic[]>([])
   const [selectedEpicId, setSelectedEpicId] = useState<string>('')
   const [loadingEpics, setLoadingEpics] = useState(false)
-  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false)
-  const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
   
   // Story state
   const [stories, setStories] = useState<Story[]>([])
@@ -408,14 +400,19 @@ function StoriesContent() {
         setLoadingEpics(false)
         
         // Handle epic selection from URL or auto-select first epic
-        if (urlEpicId && !selectedEpicId) {
-          const epic = updatedEpics.find(e => e.id === urlEpicId)
-          if (epic) {
-            setSelectedEpicId(urlEpicId)
+        if (updatedEpics.length > 0) {
+          if (urlEpicId) {
+            const epic = updatedEpics.find(e => e.id === urlEpicId)
+            if (epic) {
+              setSelectedEpicId(urlEpicId)
+            } else {
+              // URL epic not found, select first epic
+              setSelectedEpicId(updatedEpics[0].id)
+            }
+          } else if (!selectedEpicId) {
+            // No URL epic and no current selection, select first epic
+            setSelectedEpicId(updatedEpics[0].id)
           }
-        } else if (!selectedEpicId && updatedEpics.length > 0) {
-          // Auto-select first epic if none selected
-          setSelectedEpicId(updatedEpics[0].id)
         }
       })
       
@@ -625,7 +622,7 @@ function StoriesContent() {
 
     // Ultra-fast validation
     if (!newStatus || newStatus.startsWith('story_') || 
-        !['backlog', 'ready', 'in_progress', 'review', 'testing', 'done'].includes(newStatus)) {
+        !['backlog', 'planning', 'sprint_ready'].includes(newStatus)) {
       return
     }
 
@@ -661,11 +658,8 @@ function StoriesContent() {
   const storiesByStatus = React.useMemo(() => {
     const grouped: Record<string, Story[]> = {
       backlog: [],
-      ready: [],
-      in_progress: [],
-      review: [],
-      testing: [],
-      done: []
+      planning: [],
+      sprint_ready: []
     }
 
     const searchLower = searchQuery.toLowerCase().trim()
@@ -710,241 +704,7 @@ function StoriesContent() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <DashboardHeader />
 
-      {/* Mobile Epic Filter Overlay */}
-      {mobileFilterOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="fixed inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setMobileFilterOpen(false)} />
-          <div className="fixed left-0 top-0 h-full w-80 max-w-[85vw] bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 shadow-lg border-r">
-            <div className="h-full flex flex-col">
-              {/* Mobile Sidebar Header */}
-              <div className="p-4 border-b">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Filter className="h-5 w-5 text-primary" />
-                    <h2 className="font-semibold">Epic Filter</h2>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setMobileFilterOpen(false)}
-                    className="h-8 w-8 p-0"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Mobile Sidebar Content - Epic List */}
-              <div className="flex-1 overflow-y-auto p-4">
-
-                {/* Epic List */}
-                {loadingEpics ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  </div>
-                ) : epics.length === 0 ? (
-                  <div className="text-center py-8">
-                    <BookOpen className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground mb-3">No epics yet</p>
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={`/epics?project=${selectedProjectId}`}>
-                        <Plus className="mr-2 h-3 w-3" />
-                        Create Epic
-                      </Link>
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {epics.map((epic) => {
-                      const epicStoryCount = stories.filter(s => s.epicId === epic.id).length
-                      const completedEpicStories = stories.filter(s => s.epicId === epic.id && s.status === 'done').length
-                      
-                      return (
-                        <button
-                          key={epic.id}
-                          onClick={() => {
-                            handleEpicChange(epic.id)
-                            setMobileFilterOpen(false) // Close on mobile
-                          }}
-                          className={`w-full text-left p-3 rounded-lg border transition-all ${
-                            selectedEpicId === epic.id 
-                              ? 'border-primary bg-primary/10' 
-                              : 'border-gray-200 dark:border-gray-700 hover:border-primary/50'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div 
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
-                              style={{ backgroundColor: epic.color + '20', color: epic.color }}
-                            >
-                              {epic.icon ? renderEpicIcon(epic.icon, "h-4 w-4") : <FileText className="h-4 w-4" />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm truncate">{epic.name}</div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <div className="text-xs text-muted-foreground">
-                                  {epicStoryCount} stories
-                                </div>
-                                {epicStoryCount > 0 && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="text-xs px-1 py-0 h-4"
-                                    style={{ borderColor: epic.color, color: epic.color }}
-                                  >
-                                    {Math.round((completedEpicStories / epicStoryCount) * 100)}%
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                            {selectedEpicId === epic.id && (
-                              <div 
-                                className="w-2 h-2 rounded-full" 
-                                style={{ backgroundColor: epic.color }}
-                              />
-                            )}
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {/* Create Epic Link */}
-                {epics.length > 0 && (
-                  <div className="mt-6 pt-4 border-t">
-                    <Button asChild variant="ghost" size="sm" className="w-full justify-start">
-                      <Link href={`/epics?project=${selectedProjectId}`}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Manage Epics
-                      </Link>
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="flex">
-        {/* Epic Sidebar - Desktop */}
-        <div className={`${desktopSidebarCollapsed ? 'w-14' : 'w-80'} hidden md:flex flex-shrink-0 border-r bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-200`}>
-          <div className="h-full flex flex-col w-full">
-            {/* Sidebar Header */}
-            <div className="p-4 border-b">
-              <div className="flex items-center justify-between">
-                {!desktopSidebarCollapsed && (
-                  <div className="flex items-center gap-2">
-                    <Filter className="h-5 w-5 text-primary" />
-                    <h2 className="font-semibold">Epics</h2>
-                  </div>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDesktopSidebarCollapsed(!desktopSidebarCollapsed)}
-                  className="h-8 w-8 p-0"
-                >
-                  {desktopSidebarCollapsed ? (
-                    <ChevronRight className="h-4 w-4" />
-                  ) : (
-                    <ChevronLeft className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* Sidebar Content */}
-            {!desktopSidebarCollapsed && (
-              <div className="flex-1 overflow-y-auto p-4">
-
-                {/* Epic List */}
-                {loadingEpics ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  </div>
-                ) : epics.length === 0 ? (
-                  <div className="text-center py-8">
-                    <BookOpen className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground mb-3">No epics yet</p>
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={`/epics?project=${selectedProjectId}`}>
-                        <Plus className="mr-2 h-3 w-3" />
-                        Create Epic
-                      </Link>
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {epics.map((epic) => {
-                      const epicStoryCount = stories.filter(s => s.epicId === epic.id).length
-                      const completedEpicStories = stories.filter(s => s.epicId === epic.id && s.status === 'done').length
-                      
-                      return (
-                        <button
-                          key={epic.id}
-                          onClick={() => handleEpicChange(epic.id)}
-                          className={`w-full text-left p-3 rounded-lg border transition-all ${
-                            selectedEpicId === epic.id 
-                              ? 'border-primary bg-primary/10' 
-                              : 'border-gray-200 dark:border-gray-700 hover:border-primary/50'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div 
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-sm"
-                              style={{ backgroundColor: epic.color + '20', color: epic.color }}
-                            >
-                              {epic.icon ? renderEpicIcon(epic.icon, "h-4 w-4") : <FileText className="h-4 w-4" />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-sm truncate">{epic.name}</div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <div className="text-xs text-muted-foreground">
-                                  {epicStoryCount} stories
-                                </div>
-                                {epicStoryCount > 0 && (
-                                  <Badge 
-                                    variant="outline" 
-                                    className="text-xs px-1 py-0 h-4"
-                                    style={{ borderColor: epic.color, color: epic.color }}
-                                  >
-                                    {Math.round((completedEpicStories / epicStoryCount) * 100)}%
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                            {selectedEpicId === epic.id && (
-                              <div 
-                                className="w-2 h-2 rounded-full" 
-                                style={{ backgroundColor: epic.color }}
-                              />
-                            )}
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {/* Create Epic Link */}
-                {epics.length > 0 && (
-                  <div className="mt-6 pt-4 border-t">
-                    <Button asChild variant="ghost" size="sm" className="w-full justify-start">
-                      <Link href={`/epics?project=${selectedProjectId}`}>
-                        <Plus className="mr-2 h-4 w-4" />
-                        Manage Epics
-                      </Link>
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1 min-w-0">
+      <div>
           <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -953,16 +713,6 @@ function StoriesContent() {
               <p className="text-muted-foreground mt-1">Drag and drop stories across workflow stages</p>
             </div>
             <div className="flex items-center gap-2">
-              {/* Mobile Filter Button */}
-              <Button
-                variant="outline"
-                size="lg"
-                className="md:hidden"
-                onClick={() => setMobileFilterOpen(true)}
-              >
-                <Filter className="mr-2 h-5 w-5" />
-                Epic Filter
-              </Button>
               <Button size="lg" disabled={!selectedProject} onClick={handleOpenCreateModal}>
                 <Plus className="mr-2 h-5 w-5" />
                 Create Story
@@ -970,11 +720,12 @@ function StoriesContent() {
             </div>
           </div>
 
-          {/* Project Selector */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
-            <div className="flex items-center gap-3">
+          {/* Project and Epic Selectors */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            {/* Project Selector */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
               <label className="text-sm font-medium whitespace-nowrap">Project:</label>
-              <div className="min-w-[200px]">
+              <div className="w-full sm:min-w-[200px]">
                 <Select value={selectedProjectId} onValueChange={handleProjectChange}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select project..." />
@@ -991,15 +742,71 @@ function StoriesContent() {
                   </SelectContent>
                 </Select>
               </div>
+              {!selectedProject && projects.length === 0 && (
+                <Button asChild className="w-full sm:w-auto">
+                  <Link href="/projects">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Project
+                  </Link>
+                </Button>
+              )}
             </div>
-            
-            {!selectedProject && projects.length === 0 && (
-              <Button asChild>
-                <Link href="/projects">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Project
-                </Link>
-              </Button>
+
+            {/* Epic Selector */}
+            {selectedProjectId && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+                <label className="text-sm font-medium whitespace-nowrap">Epic:</label>
+                <div className="w-full sm:min-w-[200px]">
+                  <Select value={selectedEpicId} onValueChange={handleEpicChange}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select epic..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {loadingEpics ? (
+                        <SelectItem value="loading" disabled>
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Loading epics...</span>
+                          </div>
+                        </SelectItem>
+                      ) : epics.length === 0 ? (
+                        <SelectItem value="no-epics" disabled>
+                          <div className="flex items-center gap-2">
+                            <BookOpen className="h-4 w-4 text-muted-foreground" />
+                            <span>No epics available</span>
+                          </div>
+                        </SelectItem>
+                      ) : (
+                        epics.map((epic) => {
+                          const epicStoryCount = stories.filter(s => s.epicId === epic.id).length
+                          return (
+                            <SelectItem key={epic.id} value={epic.id}>
+                              <div className="flex items-center gap-2">
+                                <div 
+                                  className="w-4 h-4 rounded flex items-center justify-center" 
+                                  style={{ backgroundColor: epic.color }}
+                                >
+                                  {epic.icon ? renderEpicIcon(epic.icon, "h-2.5 w-2.5 text-white") : <FileText className="h-2.5 w-2.5 text-white" />}
+                                </div>
+                                <span>{epic.name}</span>
+                                <span className="text-xs text-muted-foreground">• {epicStoryCount} stories</span>
+                              </div>
+                            </SelectItem>
+                          )
+                        })
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {epics.length === 0 && !loadingEpics && (
+                  <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
+                    <Link href={`/epics?project=${selectedProjectId}`}>
+                      <Plus className="mr-2 h-3 w-3" />
+                      Create Epic
+                    </Link>
+                  </Button>
+                )}
+              </div>
             )}
           </div>
 
@@ -1037,18 +844,18 @@ function StoriesContent() {
             </Card>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+                <CardTitle className="text-sm font-medium">Sprint Ready</CardTitle>
                 <Clock className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{stats.storiesByStatus?.in_progress || 0}</div>
-                <p className="text-xs text-muted-foreground">Working</p>
+                <div className="text-2xl font-bold">{stats.storiesByStatus?.sprint_ready || 0}</div>
+                <p className="text-xs text-muted-foreground">Ready for Sprint</p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Search and Epic Filter Status */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+          {/* Search */}
+          <div className="mb-6">
             <div className="relative w-full max-w-sm">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -1068,33 +875,6 @@ function StoriesContent() {
                 </Button>
               )}
             </div>
-            
-            {selectedEpicId && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Filtered by:</span>
-                {(() => {
-                  const selectedEpic = epics.find(e => e.id === selectedEpicId)
-                  return selectedEpic ? (
-                    <Badge 
-                      variant="outline" 
-                      className="flex items-center gap-2"
-                      style={{ borderColor: selectedEpic.color, color: selectedEpic.color }}
-                    >
-                      {selectedEpic.icon ? renderEpicIcon(selectedEpic.icon, "h-3 w-3") : <FileText className="h-3 w-3" />}
-                      <span>{selectedEpic.name}</span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEpicChange('')}
-                        className="h-4 w-4 p-0 ml-1 hover:bg-transparent"
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </Badge>
-                  ) : null
-                })()} 
-              </div>
-            )}
           </div>
         </div>
 
@@ -1125,8 +905,8 @@ function StoriesContent() {
             onDragEnd={handleDragEnd}
             autoScroll={false}
           >
-            {/* Mobile: Vertical Stack / Desktop: Horizontal Scroll */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-4 md:flex md:gap-6 md:overflow-x-auto md:pb-4">
+            {/* Mobile: Vertical Stack / Desktop: 3-Column Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
               {KANBAN_COLUMNS.map((column) => (
                 <DroppableColumn
                   key={column.id}
@@ -1158,7 +938,6 @@ function StoriesContent() {
 
           </main>
         </div>
-      </div>
 
       {/* Create Story Modal */}
       {selectedProject && (

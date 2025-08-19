@@ -48,7 +48,7 @@ function CreateSessionContent() {
   const [selectedEpic, setSelectedEpic] = useState<Epic | null>(null)
   const [loadingProjects, setLoadingProjects] = useState(true)
   const [loadingEpics, setLoadingEpics] = useState(false)
-  const [readyStoriesCount, setReadyStoriesCount] = useState(0)
+  const [planningStoriesCount, setPlanningStoriesCount] = useState(0)
   const [checkingStories, setCheckingStories] = useState(false)
 
   useEffect(() => {
@@ -100,10 +100,10 @@ function CreateSessionContent() {
     }
   }, [epics, urlEpicId])
 
-  // Check for ready stories when epic is selected
+  // Check for planning stories when epic is selected
   useEffect(() => {
     if (selectedEpicId && selectedProjectId) {
-      checkReadyStories()
+      checkPlanningStories()
     }
   }, [selectedEpicId, selectedProjectId])
 
@@ -141,19 +141,19 @@ function CreateSessionContent() {
     }
   }
 
-  const checkReadyStories = async () => {
+  const checkPlanningStories = async () => {
     if (!selectedProjectId || !selectedEpicId) return
     
     setCheckingStories(true)
     try {
       const stories = await getStoriesByProject(selectedProjectId, {
         epicId: selectedEpicId,
-        status: ['ready']
+        status: ['planning']
       })
-      setReadyStoriesCount(stories.length)
+      setPlanningStoriesCount(stories.length)
     } catch (error) {
-      console.error('Error checking ready stories:', error)
-      setReadyStoriesCount(0)
+      console.error('Error checking planning stories:', error)
+      setPlanningStoriesCount(0)
     } finally {
       setCheckingStories(false)
     }
@@ -182,14 +182,14 @@ function CreateSessionContent() {
       return
     }
 
-    // Validate epic selection and ready stories
+    // Validate epic selection and planning stories
     if (!selectedEpicId) {
       toast.error("Please select an epic")
       return
     }
 
-    if (readyStoriesCount === 0) {
-      toast.error("No stories are ready for estimation. Please move stories to 'Ready' status first.")
+    if (planningStoriesCount === 0) {
+      toast.error("No stories are ready for estimation. Please move stories to 'Planning' status first.")
       return
     }
 
@@ -387,23 +387,23 @@ function CreateSessionContent() {
                           </Select>
                         </div>
                         
-                        {/* Ready Stories Alert */}
+                        {/* Planning Stories Alert */}
                         {selectedEpicId && (
-                          <Alert className={readyStoriesCount === 0 ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/20' : 'border-green-500 bg-green-50 dark:bg-green-950/20'}>
-                            <AlertCircle className={`h-4 w-4 ${readyStoriesCount === 0 ? 'text-orange-600' : 'text-green-600'}`} />
-                            <AlertDescription className={readyStoriesCount === 0 ? 'text-orange-800 dark:text-orange-200' : 'text-green-800 dark:text-green-200'}>
+                          <Alert className={planningStoriesCount === 0 ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/20' : 'border-green-500 bg-green-50 dark:bg-green-950/20'}>
+                            <AlertCircle className={`h-4 w-4 ${planningStoriesCount === 0 ? 'text-orange-600' : 'text-green-600'}`} />
+                            <AlertDescription className={planningStoriesCount === 0 ? 'text-orange-800 dark:text-orange-200' : 'text-green-800 dark:text-green-200'}>
                               {checkingStories ? (
                                 <span className="flex items-center gap-2">
                                   <Loader2 className="h-4 w-4 animate-spin" />
-                                  Checking for ready stories...
+                                  Checking for planning stories...
                                 </span>
-                              ) : readyStoriesCount === 0 ? (
+                              ) : planningStoriesCount === 0 ? (
                                 <span>
-                                  <strong>No stories ready for estimation.</strong> Move stories to &quot;Ready&quot; status in the Stories page before creating a session.
+                                  <strong>No stories ready for estimation.</strong> Move stories to &quot;Planning&quot; status in the Stories page before creating a session.
                                 </span>
                               ) : (
                                 <span>
-                                  <strong>{readyStoriesCount} {readyStoriesCount === 1 ? 'story' : 'stories'} ready</strong> for estimation in this epic.
+                                  <strong>{planningStoriesCount} {planningStoriesCount === 1 ? 'story' : 'stories'} ready</strong> for estimation in this epic.
                                 </span>
                               )}
                             </AlertDescription>
@@ -514,7 +514,7 @@ function CreateSessionContent() {
                       type="submit" 
                       size="lg"
                       className="w-full h-14 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-200" 
-                      disabled={isLoading || !selectedEpicId || readyStoriesCount === 0}
+                      disabled={isLoading || !selectedEpicId || planningStoriesCount === 0}
                     >
                       {isLoading ? (
                         <>
@@ -526,7 +526,7 @@ function CreateSessionContent() {
                           <Target className="h-5 w-5 mr-3" />
                           Select Epic to Continue
                         </>
-                      ) : readyStoriesCount === 0 ? (
+                      ) : planningStoriesCount === 0 ? (
                         <>
                           <AlertCircle className="h-5 w-5 mr-3" />
                           No Stories Ready for Estimation
@@ -556,8 +556,8 @@ function CreateSessionContent() {
                         <div className="w-2 h-2 rounded-full bg-primary"></div>
                       </div>
                       <div className="text-sm">
-                        <div className="font-medium">Ready stories imported</div>
-                        <div className="text-muted-foreground">All &quot;Ready&quot; stories from your epic will be loaded</div>
+                        <div className="font-medium">Planning stories imported</div>
+                        <div className="text-muted-foreground">All &quot;Planning&quot; stories from your epic will be loaded</div>
                       </div>
                     </div>
                     <div className="flex gap-3">
@@ -597,7 +597,7 @@ function CreateSessionContent() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="text-sm space-y-2">
-                    <p>• Move stories to &quot;Ready&quot; status before planning</p>
+                    <p>• Move stories to &quot;Planning&quot; status before estimation</p>
                     <p>• Fibonacci sequence works for most teams</p>
                     <p>• One epic per session works best</p>
                     <p>• Encourage discussion before revealing votes</p>

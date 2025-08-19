@@ -156,8 +156,8 @@ export default function SessionPage() {
     }
   }, [sessionId, router, isFreshJoin])
 
-  // Auto-import ready stories when session loads
-  const importReadyStories = async (sessionData: Session) => {
+  // Auto-import planning stories when session loads
+  const importPlanningStories = async (sessionData: Session) => {
     // Only import if session has epic info, no stories yet, and haven't imported before
     if (!sessionData.epicId || !sessionData.projectId || sessionData.stories.length > 0 || storiesImported || importingStories) {
       return
@@ -165,18 +165,18 @@ export default function SessionPage() {
 
     setImportingStories(true)
     try {
-      // Fetch all ready stories from the epic
-      const readyStories = await getStoriesByProject(sessionData.projectId, {
+      // Fetch all planning stories from the epic
+      const planningStories = await getStoriesByProject(sessionData.projectId, {
         epicId: sessionData.epicId,
-        status: ['ready']
+        status: ['planning']
       })
 
-      // Sync session with ready stories
-      await syncSessionWithProjectStories(sessionId, readyStories, sessionData.epicId!)
+      // Sync session with planning stories
+      await syncSessionWithProjectStories(sessionId, planningStories, sessionData.epicId!)
 
       setStoriesImported(true)
     } catch (error) {
-      console.error('Error importing ready stories:', error)
+      console.error('Error importing planning stories:', error)
     } finally {
       setImportingStories(false)
     }
@@ -192,11 +192,11 @@ export default function SessionPage() {
   // Auto-import stories when session loads (only for host)
   useEffect(() => {
     if (session && isHost && !loading) {
-      importReadyStories(session)
+      importPlanningStories(session)
     }
   }, [session, isHost, loading, sessionId, storiesImported, importingStories])
 
-  // Subscribe to project stories to auto-add new ready stories (only for host)
+  // Subscribe to project stories to auto-add new planning stories (only for host)
   useEffect(() => {
     if (!session?.projectId || !session?.epicId || !isHost) return
 
@@ -302,7 +302,7 @@ export default function SessionPage() {
 
   // Emergency story creation handler
   const handleEmergencyStoryCreated = () => {
-    // Story was created in project with "ready" status
+    // Story was created in project with "planning" status
     // Session will automatically pick it up through real-time subscriptions
     setShowEmergencyStoryModal(false)
   }
@@ -841,8 +841,8 @@ export default function SessionPage() {
                 <div className="space-y-2">
                   {session.stories.length === 0 ? (
                     <div className="text-center py-6 text-muted-foreground">
-                      <p>No ready stories found.</p>
-                      {isHost && <p className="text-sm">Create stories in the Stories page and mark them as &apos;Ready&apos; to import them here.</p>}
+                      <p>No planning stories found.</p>
+                      {isHost && <p className="text-sm">Create stories in the Stories page and mark them as &apos;Planning&apos; to import them here.</p>}
                     </div>
                   ) : (
                     session.stories.map((story) => (
@@ -944,7 +944,7 @@ export default function SessionPage() {
           projectId={session.projectId}
           onStoryCreated={handleEmergencyStoryCreated}
           defaultEpicId={session.epicId}
-          sessionMode={true} // Force 'ready' status instead of 'backlog'
+          sessionMode={true} // Force 'planning' status instead of 'backlog'
         />
       )}
 

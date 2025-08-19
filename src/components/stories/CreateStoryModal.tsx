@@ -387,7 +387,7 @@ export default function CreateStoryModal({
           dependencyIds: [],
           blockedByIds: [],
           relatedStoryIds: [],
-          status: sessionMode ? "ready" : "backlog",
+          status: sessionMode ? "planning" : "backlog",
           blockers: [],
           reportedBy: user.uid,
           stakeholders: [],

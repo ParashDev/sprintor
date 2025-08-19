@@ -599,6 +599,8 @@ subscribeToUserProjects(ownerId, callback) → Function // Real-time project upd
 getSessionsByProject(hostId, projectId) → Promise<Session[]>     // Project-scoped sessions
 getProjectSessionStats(hostId, projectId) → Promise<Stats>      // Project-specific metrics
 getSessionStats(hostId) → Promise<Stats>                        // Global user stats (legacy)
+syncSessionWithProjectStories(sessionId, stories[], epicId) → Promise<void> // Bidirectional sync
+importReadyStoriesIntoSession(sessionId, stories[]) → Promise<void>         // Legacy wrapper
 ```
 
 ### Story Service Extensions (story-service.ts)
@@ -613,43 +615,44 @@ getProjectStoryStats(projectId) → Promise<StoryStats>         // Story statist
 createStoryTemplate(templateData) → Promise<string>           // Create story template
 getStoryTemplates(projectId?) → Promise<StoryTemplate[]>      // Get available templates
 
-// 🎯 TO BE IMPLEMENTED: Planning Session Integration
-getUnestimatedStories(projectId) → Promise<Story[]>           // Get stories ready for estimation
-importStoriesToSession(sessionId, storyIds[]) → Promise<void> // Import stories to planning session
-syncEstimationResults(sessionId, storyResults[]) → Promise<void> // Sync results back to stories
-markStoryEstimated(storyId, sessionId, estimate) → Promise<void> // Mark story as estimated
+// ✅ IMPLEMENTED: Planning Session Integration
+syncSessionWithProjectStories(sessionId, stories[], epicId) → Promise<void> // Bidirectional sync
+importReadyStoriesIntoSession(sessionId, stories[]) → Promise<void>         // Legacy wrapper function
 ```
 
-## Current Architecture Status: COMPLETED ✅
+## Current Architecture Status: PRODUCTION READY ✅
 
-### ✅ Implemented Features
-- **Project-Centric Planning**: Full project → sessions → stories hierarchy
+### ✅ COMPLETED: Unified Story-Session Integration
+- **Project-Centric Planning**: Full project → epics → stories → sessions hierarchy
 - **Firebase Authentication**: Host authentication with Google/Email
 - **Project Management**: Complete CRUD operations with real-time updates
-- **Project-Scoped Sessions**: Sessions filtered by selected project
-- **Project-Specific Stats**: Dashboard metrics calculated per project
-- **Performance Optimized**: Input lag resolved, React state optimized
+- **Epic Management**: Complete epic lifecycle with story assignment and progress tracking
+- **Story Management**: Full Kanban workflow with drag-and-drop, mobile support
+- **Unified Story System**: Single story creation flow, eliminated dual story types
+- **Bidirectional Real-time Sync**: Stories page ↔ Planning sessions with complete data sync
+- **Performance Optimized**: Input lag resolved, React state optimized, mobile drag performance
 - **Smart Reconnection**: Time-based logic prevents false reconnect prompts
 
-### Next Implementation Phase: Story-Session Integration 🎯
+### ✅ COMPLETED: Story-Planning Session Integration
+**RESOLVED**: Stories created in Stories page and planning session stories are now fully integrated
 
-#### 🔥 CRITICAL: Story-Planning Session Integration (Priority 1)
-**Current Issue**: Stories created in Stories page and planning session stories are completely disconnected
+**Implemented Solution**:
+1. ✅ **Unified Story Creation**: All stories created via Stories page CreateStoryModal
+2. ✅ **Real-time Import**: Ready stories automatically appear in planning sessions
+3. ✅ **Bidirectional Sync**: Complete sync between Stories page and sessions (add/update/delete)
+4. ✅ **Estimation Sync**: Voting results automatically sync back as story points
+5. ✅ **Emergency Creation**: In-session story creation with auto-ready status
+6. ✅ **Status Integration**: Stories workflow integrated with session lifecycle
+7. ✅ **Permission Security**: Host-only data sync, participants vote safely
 
-**Required Implementation**:
-1. **Story Import to Sessions**: Allow importing pre-created stories from Stories page into planning sessions
-2. **Backlog Selection Interface**: Add story selection UI when creating/starting planning sessions
-3. **Estimation Sync**: Sync voting results from planning sessions back to Stories collection
-4. **Status Integration**: Show estimation status (estimated/not estimated) in Stories Kanban board
-5. **Workflow Integration**: Complete the proper agile workflow: Stories Page (prepare) → Planning Session (vote) → Results sync back
-
-**Expected Workflow**:
+**Production Workflow**:
 ```
 1. Team prepares backlog in Stories page (create stories, set priorities, acceptance criteria)
-2. Planning meeting: Host selects stories from backlog to estimate
-3. Team votes on imported stories during planning session
-4. Estimation results automatically sync back to Stories collection
-5. Stories Kanban board shows estimation status and results
+2. Stories marked as 'Ready' automatically appear in planning sessions
+3. Team votes on stories during planning session (initial + re-voting)
+4. Estimation results automatically sync back as story points
+5. Real-time updates: edit/delete stories in Stories page reflects in sessions immediately
+6. Emergency story creation available during planning sessions
 ```
 
 #### Additional Planned Enhancements
@@ -791,10 +794,11 @@ NEXTAUTH_URL=
 
 ## Common Development Tasks
 
-### Adding a New Story to Vote On
-1. Use the `addStory()` function in `session-service.ts`
-2. Story requires: title, optional description
-3. Auto-generates: id, createdAt timestamp, isEstimated: false
+### Adding Stories for Estimation
+1. Create stories in Stories page with full story details
+2. Set story status to 'Ready' to make available for planning sessions
+3. Stories automatically appear in sessions for the selected epic
+4. Use "Emergency Story" button in sessions for quick creation during planning
 
 ### Testing Real-time Features
 1. Open multiple browser tabs/windows
@@ -832,8 +836,6 @@ Sprintor is now a **complete, production-ready planning poker application** with
 
 The architecture successfully supports the **project → sessions → stories** hierarchy with real-time updates, project-specific metrics, and seamless user experience. All code follows TypeScript best practices and is production-ready for Vercel/Railway deployment.
 
-**The next major development phase is integrating the Stories page with planning sessions to create a proper agile workflow where teams prepare backlogs first, then conduct estimation sessions on those prepared stories.**
+**The unified story-session integration has been completed, transforming Sprintor from a standalone planning poker tool into a complete agile story management system with full bidirectional sync between story preparation and estimation phases.**
 
-This will transform Sprintor from a standalone planning poker tool into a complete agile story management system!
-
-**Ready for production deployment and user testing!** 🚀
+**All major architectural goals achieved and system is production-ready!** 🚀

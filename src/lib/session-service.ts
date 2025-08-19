@@ -277,26 +277,26 @@ export async function syncSessionWithProjectStories(sessionId: string, projectSt
   const session = await getSession(sessionId)
   if (!session) return
 
-  // Get current ready stories for the epic
-  const currentReadyStories = projectStories.filter(story => 
-    story.status === 'ready' && story.epicId === epicId
+  // Get current planning stories for the epic
+  const currentPlanningStories = projectStories.filter(story => 
+    story.status === 'planning' && story.epicId === epicId
   )
 
   // Sync logic:
-  // 1. Add new ready stories that aren't in session
-  // 2. Remove session stories that are no longer ready or deleted
+  // 1. Add new planning stories that aren't in session
+  // 2. Remove session stories that are no longer in planning or deleted
   // 3. Update existing session stories with latest project data
 
-  // Stories to add (new ready stories)
-  const storiesToAdd = currentReadyStories.filter(projectStory => 
+  // Stories to add (new planning stories)
+  const storiesToAdd = currentPlanningStories.filter(projectStory => 
     !session.stories.some(sessionStory => sessionStory.originalStoryId === projectStory.id)
   )
 
-  // Stories to keep and update (existing session stories that are still ready)
+  // Stories to keep and update (existing session stories that are still in planning)
   const storiesToUpdate = session.stories.filter(sessionStory => 
-    currentReadyStories.some(projectStory => projectStory.id === sessionStory.originalStoryId)
+    currentPlanningStories.some(projectStory => projectStory.id === sessionStory.originalStoryId)
   ).map(sessionStory => {
-    const projectStory = currentReadyStories.find(ps => ps.id === sessionStory.originalStoryId)!
+    const projectStory = currentPlanningStories.find(ps => ps.id === sessionStory.originalStoryId)!
     return {
       ...sessionStory,
       title: projectStory.title,
@@ -539,7 +539,7 @@ export async function endSession(sessionId: string): Promise<void> {
   const session = await getSession(sessionId)
   if (!session) return
 
-  // Update all estimated stories from "ready" to "in_progress" in project collection
+  // Update all estimated stories from "planning" to "sprint_ready" in project collection
   const estimatedStories = session.stories.filter(story => 
     story.isEstimated && story.originalStoryId
   )
@@ -547,7 +547,7 @@ export async function endSession(sessionId: string): Promise<void> {
   for (const sessionStory of estimatedStories) {
     try {
       await updateStory(sessionStory.originalStoryId!, {
-        status: 'in_progress',
+        status: 'sprint_ready',
         updatedAt: new Date()
       })
     } catch (error) {
