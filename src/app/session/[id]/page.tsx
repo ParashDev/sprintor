@@ -829,7 +829,7 @@ export default function SessionPage() {
                       size="sm" 
                       variant="outline" 
                       onClick={() => setShowEmergencyStoryModal(true)}
-                      title="Create emergency story (will be marked as 'Ready' for immediate use)"
+                      title="Create emergency story (will be marked as 'Planning' for immediate use)"
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Emergency Story

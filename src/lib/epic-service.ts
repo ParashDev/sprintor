@@ -232,19 +232,16 @@ export async function getEpicStats(epicId: string): Promise<EpicStats> {
       totalStories++
       
       switch (story.status) {
-        case 'done':
+        case 'sprint_ready':
           completedStories++
           if (story.storyPoints) {
             completedStoryPoints += story.storyPoints
           }
           break
-        case 'in_progress':
-        case 'review':
-        case 'testing':
+        case 'planning':
           inProgressStories++
           break
         case 'backlog':
-        case 'ready':
           backlogStories++
           break
       }

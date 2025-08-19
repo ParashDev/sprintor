@@ -467,8 +467,8 @@ export async function getProjectStoryStats(projectId: string): Promise<{
         storiesWithPoints++
       }
       
-      // Count completed stories
-      if (story.status === 'done') {
+      // Count completed stories (stories ready for sprint)
+      if (story.status === 'sprint_ready') {
         completedStories++
       }
     })
