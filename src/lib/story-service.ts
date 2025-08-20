@@ -47,7 +47,7 @@ function convertFirestoreStory(doc: FirestoreStory): Story {
     comments: doc.comments?.map(comment => ({
       ...comment,
       createdAt: comment.createdAt instanceof Date ? comment.createdAt : 
-        (comment.createdAt && typeof comment.createdAt.toDate === 'function' ? comment.createdAt.toDate() : new Date())
+        (comment.createdAt && typeof (comment.createdAt as any).toDate === 'function' ? (comment.createdAt as any).toDate() : new Date())
     })) || []
   } as Story
 }
