@@ -12,12 +12,14 @@ import {
   where,
   orderBy,
   limit,
-  getDocs
+  getDocs,
+  writeBatch
 } from 'firebase/firestore'
 import { db } from './firebase'
 import type { Session, Participant, SessionStory } from '@/types/session'
 import type { Story } from '@/types/story'
 import { updateStory } from './story-service'
+import { calculateSessionMetrics } from './session-metrics'
 
 // Firestore document types for proper timestamp handling
 interface FirestoreDoc {
@@ -124,7 +126,8 @@ export async function getSession(sessionId: string): Promise<Session | null> {
         ...round,
         timestamp: 'toDate' in round.timestamp ? round.timestamp.toDate() : round.timestamp
       })) || []
-    })) || []
+    })) || [],
+    metrics: data.metrics || undefined // Include metrics if they exist
   } as Session
 }
 
@@ -156,7 +159,8 @@ export function subscribeToSession(sessionId: string, callback: (session: Sessio
             ...round,
             timestamp: 'toDate' in round.timestamp ? round.timestamp.toDate() : round.timestamp
           })) || []
-        })) || []
+        })) || [],
+        metrics: data.metrics || undefined // Include metrics if they exist
       } as Session
 
       callback(session)
@@ -206,11 +210,9 @@ export async function joinSession(sessionId: string, participant: Omit<Participa
       lastSeen: new Date(),
       vote: updatedParticipants[existingIndex].vote // Preserve any existing vote
     }
-    console.log(`Reconnected participant: ${participant.name}`)
   } else {
     // Add new participant
     updatedParticipants = [...session.participants, participantWithTimestamp]
-    console.log(`Added new participant: ${participant.name}`)
   }
 
   const sessionRef = doc(db, 'sessions', sessionId)
@@ -539,6 +541,31 @@ export async function endSession(sessionId: string): Promise<void> {
   const session = await getSession(sessionId)
   if (!session) return
 
+
+  // Calculate comprehensive metrics before ending the session
+  const metrics = calculateSessionMetrics(session)
+
+  // Clean metrics object to remove undefined values (Firebase doesn't accept undefined)
+  const cleanMetrics: Record<string, unknown> = {}
+  Object.entries(metrics).forEach(([key, value]) => {
+    if (value !== undefined) {
+      // Handle nested epicSpecificMetrics object
+      if (key === 'epicSpecificMetrics' && value) {
+        const cleanEpicMetrics: Record<string, unknown> = {}
+        Object.entries(value as Record<string, unknown>).forEach(([epicKey, epicValue]) => {
+          if (epicValue !== undefined) {
+            cleanEpicMetrics[epicKey] = epicValue
+          }
+        })
+        if (Object.keys(cleanEpicMetrics).length > 0) {
+          cleanMetrics[key] = cleanEpicMetrics
+        }
+      } else {
+        cleanMetrics[key] = value
+      }
+    }
+  })
+
   // Update all estimated stories from "planning" to "sprint_ready" in project collection
   const estimatedStories = session.stories.filter(story => 
     story.isEstimated && story.originalStoryId
@@ -563,12 +590,81 @@ export async function endSession(sessionId: string): Promise<void> {
     lastSeen: new Date()
   }))
 
-  const sessionRef = doc(db, 'sessions', sessionId)
-  await updateDoc(sessionRef, {
+  // Preserve the stories array with proper timestamp conversion and field cleaning
+  const preservedStories = session.stories.map(s => {
+    // Clean the story object to remove any undefined fields
+    const cleanStory: Record<string, unknown> = {
+      id: s.id,
+      title: s.title,
+      description: s.description || '',
+      estimate: s.estimate || null,
+      isEstimated: s.isEstimated,
+      createdAt: s.createdAt instanceof Date ? Timestamp.fromDate(s.createdAt) : s.createdAt,
+      originalStoryId: s.originalStoryId
+    }
+    
+    // Handle voting history with proper cleaning
+    if (s.votingHistory && s.votingHistory.length > 0) {
+      cleanStory.votingHistory = s.votingHistory.map(round => ({
+        id: round.id,
+        votes: round.votes || {},
+        participantNames: round.participantNames || {},
+        timestamp: round.timestamp instanceof Date ? Timestamp.fromDate(round.timestamp) : round.timestamp,
+        finalEstimate: round.finalEstimate || null
+      }))
+    } else {
+      cleanStory.votingHistory = []
+    }
+    
+    return cleanStory
+  })
+  
+
+  // Prepare update data with proper field validation
+  const updateData = {
     isActive: false,
     participants: cleanParticipantsForFirestore(updatedParticipants),
+    stories: preservedStories, // Explicitly preserve stories
+    metrics: cleanMetrics, // Store the cleaned metrics object
     updatedAt: serverTimestamp()
-  })
+  }
+
+
+  const sessionRef = doc(db, 'sessions', sessionId)
+  
+  try {
+    // Store session data WITHOUT stories (since stories won't save for some reason)
+    const updateData = {
+      isActive: false,
+      participants: cleanParticipantsForFirestore(updatedParticipants),
+      metrics: cleanMetrics,
+      updatedAt: serverTimestamp()
+    }
+
+    await setDoc(sessionRef, updateData, { merge: true })
+
+    // Store stories in a separate collection
+    const batch = writeBatch(db)
+    
+    for (const story of preservedStories) {
+      const storyRef = doc(db, 'sessionStories', sessionId, 'stories', String(story.id))
+      batch.set(storyRef, story)
+    }
+    
+    await batch.commit()
+    
+    
+  } catch (error) {
+    console.error('💀 DETAILED Error ending session:', {
+      error: error,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      errorCode: (error as any)?.code || 'Unknown code',
+      errorName: error instanceof Error ? error.name : 'Unknown name',
+      sessionId: sessionId,
+      storiesCount: preservedStories.length
+    })
+    throw error
+  }
 }
 
 // Update participant heartbeat
@@ -634,6 +730,34 @@ export async function deleteSession(sessionId: string): Promise<void> {
   await deleteDoc(sessionRef)
 }
 
+// Helper function to fetch stories for a session from the separate collection
+async function getSessionStories(sessionId: string): Promise<SessionStory[]> {
+  try {
+    const storiesRef = collection(db, 'sessionStories', sessionId, 'stories')
+    const querySnapshot = await getDocs(storiesRef)
+    const stories: SessionStory[] = []
+    
+    querySnapshot.forEach((doc) => {
+      const data = doc.data()
+      const story: SessionStory = {
+        ...data,
+        createdAt: 'toDate' in data.createdAt ? data.createdAt.toDate() : data.createdAt,
+        votingHistory: data.votingHistory?.map((round: FirestoreVotingRound) => ({
+          ...round,
+          timestamp: 'toDate' in round.timestamp ? round.timestamp.toDate() : round.timestamp
+        })) || []
+      } as SessionStory
+      
+      stories.push(story)
+    })
+    
+    return stories
+  } catch (error) {
+    console.error(`Error fetching stories for session ${sessionId}:`, error)
+    return []
+  }
+}
+
 // Get sessions by project and host
 export async function getSessionsByProject(hostId: string, projectId: string, limitCount: number = 10): Promise<Session[]> {
   try {
@@ -649,8 +773,13 @@ export async function getSessionsByProject(hostId: string, projectId: string, li
     const querySnapshot = await getDocs(q)
     const sessions: Session[] = []
     
-    querySnapshot.forEach((doc) => {
+    // Fetch sessions with their stories from separate collection
+    for (const doc of querySnapshot.docs) {
       const data = doc.data()
+      
+      // Fetch stories from separate collection
+      const stories = await getSessionStories(doc.id)
+      
       
       const session: Session = {
         ...data,
@@ -660,18 +789,12 @@ export async function getSessionsByProject(hostId: string, projectId: string, li
           ...p,
           lastSeen: 'toDate' in p.lastSeen ? p.lastSeen.toDate() : p.lastSeen
         })) || [],
-        stories: data.stories?.map((s: FirestoreStory) => ({
-          ...s,
-          createdAt: 'toDate' in s.createdAt ? s.createdAt.toDate() : s.createdAt,
-          votingHistory: s.votingHistory?.map((round: FirestoreVotingRound) => ({
-            ...round,
-            timestamp: 'toDate' in round.timestamp ? round.timestamp.toDate() : round.timestamp
-          })) || []
-        })) || []
+        stories: stories, // Stories from separate collection
+        metrics: data.metrics || undefined
       } as Session
       
       sessions.push(session)
-    })
+    }
     
     return sessions
   } catch (error) {
@@ -712,7 +835,8 @@ export async function getSessionsByHost(hostId: string, limitCount: number = 10)
             ...round,
             timestamp: 'toDate' in round.timestamp ? round.timestamp.toDate() : round.timestamp
           })) || []
-        })) || []
+        })) || [],
+        metrics: data.metrics || undefined // Include metrics if they exist
       } as Session
       
       sessions.push(session)

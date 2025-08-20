@@ -7,6 +7,31 @@ export interface Participant {
   vote?: string | null
 }
 
+// Comprehensive metrics captured when session ends
+export interface SessionMetrics {
+  totalStoryPoints: number           // Sum of all estimated story points (numeric decks only)
+  averagePoints: number              // Average story points per story
+  mostCommonEstimate?: string        // Most common estimate (T-shirt sizes)
+  consensusRate: number              // % of stories that reached consensus in first round
+  participationRate: number          // % of possible votes that were cast
+  highVarianceStories: number        // Count of stories with significant voting disagreement
+  reVotingRate: number              // % of stories that needed multiple voting rounds
+  sessionDurationMinutes: number     // Total session duration in minutes
+  totalVotingRounds: number         // Total number of voting rounds across all stories
+  storiesEstimated: number          // Count of stories that got estimates
+  storiesNotEstimated: number       // Count of stories without estimates
+  deckTypeUsed: string              // Deck type used for estimation
+  uniqueParticipants: number        // Number of unique participants (excluding host)
+  averageVotesPerRound: number      // Average number of votes per voting round
+  epicSpecificMetrics?: {
+    epicId: string
+    epicName: string
+    epicColor: string
+    storiesFromEpic: number
+    epicCompletionRate: number     // % of epic stories that were estimated
+  }
+}
+
 // NOTE: Story interface removed - sessions now use Story from @/types/story
 // Session stories are minimal representations for voting only:
 // { id, title, description, estimate, isEstimated, createdAt, votingHistory, originalStoryId }
@@ -51,6 +76,7 @@ export interface Session {
   createdAt: Date
   updatedAt: Date
   isActive: boolean
+  metrics?: SessionMetrics  // Comprehensive metrics stored when session ends
 }
 
 export interface Vote {

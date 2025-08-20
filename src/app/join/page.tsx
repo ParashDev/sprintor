@@ -61,7 +61,6 @@ export default function JoinSessionPage() {
         const storedName = localStorage.getItem('sprintor_user_name')
         if (storedName && storedName.toLowerCase() === formData.userName.toLowerCase()) {
           // This is likely a reconnection - allow it
-          console.log('Reconnecting existing participant')
         } else {
           alert('A participant with this name is already online in the session. Please choose a different name.')
           return

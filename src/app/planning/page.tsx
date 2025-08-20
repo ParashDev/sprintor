@@ -3,9 +3,9 @@
 import React, { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
-import { getSessionsByProject, getProjectSessionStats } from "@/lib/session-service"
+import { getSessionsByProject } from "@/lib/session-service"
 import { getProjectsByOwner } from "@/lib/project-service"
-import { getEpicsByProject, subscribeToProjectEpics } from "@/lib/epic-service"
+import { subscribeToProjectEpics } from "@/lib/epic-service"
 import { getStoriesByProject } from "@/lib/story-service"
 import type { Session } from "@/types/session"
 import type { Epic } from "@/types/epic"
@@ -37,7 +37,12 @@ import {
   Filter,
   ArrowUpDown,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  BarChart3,
+  Activity,
+  Award,
+  AlertCircle,
+  Clock
 } from "lucide-react"
 import Link from "next/link"
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader"
@@ -801,8 +806,8 @@ function PlanningContent() {
 
       {/* Session Details Modal */}
       <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
-        <DialogContent className="!max-w-4xl w-full">
-          <DialogHeader className="pb-4 border-b">
+        <DialogContent className="!max-w-6xl w-full max-h-[90vh] overflow-hidden sm:h-auto">
+          <DialogHeader className="pb-4 border-b shrink-0">
             <div className="space-y-2">
               <div className="flex items-start justify-between gap-6 mt-3">
                 <DialogTitle className="text-lg font-semibold flex-1 min-w-0">{selectedSession?.name}</DialogTitle>
@@ -820,122 +825,249 @@ function PlanningContent() {
                 <span>•</span>
                 <span>{selectedSession?.createdAt && new Date(selectedSession.createdAt).toLocaleDateString()}</span>
               </div>
-              {selectedSession?.description && (
-                <DialogDescription className="text-xs mt-2 max-h-32 overflow-y-auto">
-                  {selectedSession.description}
-                </DialogDescription>
-              )}
+              <DialogDescription className="text-xs mt-2 max-h-32 overflow-y-auto">
+                {selectedSession?.description || "View comprehensive metrics, team members, and user stories from this planning session."}
+              </DialogDescription>
             </div>
           </DialogHeader>
 
           {selectedSession && (
-            <div className="space-y-6 pt-6">
-              {/* Sprint Planning Insights Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {/* Total Story Points or Estimated Count */}
-                <div className="text-center p-3 border rounded">
-                  <div className="text-xl font-semibold">
-                    {(() => {
-                      // Only calculate total for numeric decks
-                      if (selectedSession.deckType === 'fibonacci' || selectedSession.deckType === 'powers') {
-                        const total = selectedSession.stories
-                          .filter(s => s.isEstimated && s.estimate && s.estimate !== '?')
-                          .reduce((sum, s) => {
-                            const points = parseFloat(s.estimate || '0')
-                            return isNaN(points) ? sum : sum + points
-                          }, 0)
-                        return total || '0'
-                      } else {
-                        // For non-numeric decks, show estimated count
-                        return selectedSession.stories.filter(s => s.isEstimated).length
-                      }
-                    })()}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {selectedSession.deckType === 'fibonacci' || selectedSession.deckType === 'powers' ? 'Total Points' : 'Estimated'}
-                  </div>
-                </div>
+            <div className="flex-1 overflow-hidden">
+              <div className="h-[70vh] sm:h-[75vh] overflow-y-auto pr-2">
+                <div className="space-y-6 pt-6">
+              {/* Display comprehensive metrics if available, otherwise show basic stats */}
+              {selectedSession.metrics ? (
+                <>
+                  {/* Rich Metrics Display - Using stored comprehensive metrics */}
+                  <div className="space-y-4">
+                    {/* Primary Metrics */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {/* Total Story Points or Estimated Count */}
+                      <div className="text-center p-3 border rounded bg-background">
+                        <BarChart3 className="h-4 w-4 text-foreground mx-auto mb-1" />
+                        <div className="text-xl font-semibold text-foreground">
+                          {selectedSession.metrics.deckTypeUsed === 'fibonacci' || selectedSession.metrics.deckTypeUsed === 'powers' 
+                            ? selectedSession.metrics.totalStoryPoints 
+                            : selectedSession.metrics.storiesEstimated}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {selectedSession.metrics.deckTypeUsed === 'fibonacci' || selectedSession.metrics.deckTypeUsed === 'powers' 
+                            ? 'Total Points' 
+                            : 'Stories Estimated'}
+                        </div>
+                      </div>
 
-                {/* Average Story Size or Most Common */}
-                <div className="text-center p-3 border rounded">
-                  <div className="text-xl font-semibold">
-                    {(() => {
-                      if (selectedSession.deckType === 'fibonacci' || selectedSession.deckType === 'powers') {
-                        // For numeric decks, calculate average
-                        const estimatedStories = selectedSession.stories.filter(s => 
-                          s.isEstimated && s.estimate && s.estimate !== '?' && !isNaN(parseFloat(s.estimate))
-                        )
-                        if (estimatedStories.length === 0) return '—'
-                        const avg = estimatedStories.reduce((sum, s) => sum + parseFloat(s.estimate!), 0) / estimatedStories.length
-                        return avg.toFixed(1)
-                      } else if (selectedSession.deckType === 'tshirt') {
-                        // For T-shirt sizes, show most common size
-                        const estimates = selectedSession.stories
-                          .filter(s => s.isEstimated && s.estimate && s.estimate !== '?')
-                          .map(s => s.estimate!)
-                        if (estimates.length === 0) return '—'
-                        const counts: Record<string, number> = {}
-                        estimates.forEach(e => counts[e] = (counts[e] || 0) + 1)
-                        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1])
-                        return sorted[0]?.[0] || '—'
-                      } else {
-                        // For custom decks, show remaining count
-                        return selectedSession.stories.filter(s => !s.isEstimated).length
-                      }
-                    })()}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {selectedSession.deckType === 'fibonacci' || selectedSession.deckType === 'powers' ? 'Avg Points' : 
-                     selectedSession.deckType === 'tshirt' ? 'Most Common' : 'Remaining'}
-                  </div>
-                </div>
+                      {/* Average or Most Common */}
+                      <div className="text-center p-3 border rounded bg-background">
+                        <TrendingUp className="h-4 w-4 text-foreground mx-auto mb-1" />
+                        <div className="text-xl font-semibold text-foreground">
+                          {selectedSession.metrics.deckTypeUsed === 'fibonacci' || selectedSession.metrics.deckTypeUsed === 'powers'
+                            ? selectedSession.metrics.averagePoints.toFixed(1)
+                            : selectedSession.metrics.mostCommonEstimate || '—'}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {selectedSession.metrics.deckTypeUsed === 'fibonacci' || selectedSession.metrics.deckTypeUsed === 'powers'
+                            ? 'Avg Points'
+                            : 'Most Common'}
+                        </div>
+                      </div>
 
-                {/* Consensus Rate */}
-                <div className="text-center p-3 border rounded">
-                  <div className="text-xl font-semibold">
-                    {(() => {
-                      const storiesWithVoting = selectedSession.stories.filter(s => s.votingHistory && s.votingHistory.length > 0)
-                      if (storiesWithVoting.length === 0) return '—'
-                      const firstRoundConsensus = storiesWithVoting.filter(s => s.votingHistory!.length === 1).length
-                      return `${Math.round((firstRoundConsensus / storiesWithVoting.length) * 100)}%`
-                    })()}
-                  </div>
-                  <div className="text-xs text-muted-foreground">First-Round Consensus</div>
-                </div>
+                      {/* Consensus Rate */}
+                      <div className="text-center p-3 border rounded bg-background">
+                        <Target className="h-4 w-4 text-foreground mx-auto mb-1" />
+                        <div className="text-xl font-semibold text-foreground">
+                          {selectedSession.metrics.consensusRate}%
+                        </div>
+                        <div className="text-xs text-muted-foreground">Consensus Rate</div>
+                      </div>
 
-                {/* Session Duration */}
-                <div className="text-center p-3 border rounded">
-                  <div className="text-xl font-semibold">
-                    {(() => {
-                      const sessionStart = selectedSession.createdAt
-                      const sessionEnd = selectedSession.updatedAt
-                      const diffMs = sessionEnd.getTime() - sessionStart.getTime()
-                      const diffMins = Math.floor(diffMs / (1000 * 60))
-                      return `${diffMins}m`
-                    })()}
+                      {/* Duration */}
+                      <div className="text-center p-3 border rounded bg-background">
+                        <Clock className="h-4 w-4 text-foreground mx-auto mb-1" />
+                        <div className="text-xl font-semibold text-foreground">
+                          {selectedSession.metrics.sessionDurationMinutes}m
+                        </div>
+                        <div className="text-xs text-muted-foreground">Duration</div>
+                      </div>
+                    </div>
+
+                    {/* Secondary Metrics */}
+                    <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+                      {/* Participation Rate */}
+                      <div className="text-center p-3 border rounded">
+                        <Users className="h-3 w-3 text-muted-foreground mx-auto mb-1" />
+                        <div className="text-lg font-semibold">{selectedSession.metrics.participationRate}%</div>
+                        <div className="text-xs text-muted-foreground">Participation</div>
+                      </div>
+
+                      {/* Re-voting Rate */}
+                      <div className="text-center p-3 border rounded">
+                        <Activity className="h-3 w-3 text-muted-foreground mx-auto mb-1" />
+                        <div className="text-lg font-semibold">{selectedSession.metrics.reVotingRate}%</div>
+                        <div className="text-xs text-muted-foreground">Re-voting</div>
+                      </div>
+
+                      {/* High Variance */}
+                      <div className="text-center p-3 border rounded">
+                        <AlertCircle className="h-3 w-3 text-muted-foreground mx-auto mb-1" />
+                        <div className="text-lg font-semibold">{selectedSession.metrics.highVarianceStories}</div>
+                        <div className="text-xs text-muted-foreground">High Variance</div>
+                      </div>
+
+                      {/* Voting Rounds */}
+                      <div className="text-center p-3 border rounded">
+                        <Award className="h-3 w-3 text-muted-foreground mx-auto mb-1" />
+                        <div className="text-lg font-semibold">{selectedSession.metrics.totalVotingRounds}</div>
+                        <div className="text-xs text-muted-foreground">Total Rounds</div>
+                      </div>
+
+                      {/* Unique Participants */}
+                      <div className="text-center p-3 border rounded">
+                        <Users className="h-3 w-3 text-muted-foreground mx-auto mb-1" />
+                        <div className="text-lg font-semibold">{selectedSession.metrics.uniqueParticipants}</div>
+                        <div className="text-xs text-muted-foreground">Team Size</div>
+                      </div>
+
+                      {/* Avg Votes/Round */}
+                      <div className="text-center p-3 border rounded">
+                        <BarChart3 className="h-3 w-3 text-muted-foreground mx-auto mb-1" />
+                        <div className="text-lg font-semibold">{selectedSession.metrics.averageVotesPerRound.toFixed(1)}</div>
+                        <div className="text-xs text-muted-foreground">Avg Votes</div>
+                      </div>
+                    </div>
+
+
+                    {/* Story Completion Summary */}
+                    <div className="flex items-center justify-between p-4 border rounded bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 className="h-5 w-5 text-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">Story Completion</p>
+                          <p className="text-xs text-muted-foreground">
+                            {selectedSession.metrics.storiesEstimated} of {selectedSession.metrics.storiesEstimated + selectedSession.metrics.storiesNotEstimated} stories estimated
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-foreground">
+                          {Math.round((selectedSession.metrics.storiesEstimated / (selectedSession.metrics.storiesEstimated + selectedSession.metrics.storiesNotEstimated)) * 100)}%
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">Duration</div>
-                </div>
-              </div>
+                </>
+              ) : (
+                <>
+                  {/* Fallback: Basic stats for sessions without stored metrics */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* Total Story Points or Estimated Count */}
+                    <div className="text-center p-3 border rounded">
+                      <div className="text-xl font-semibold">
+                        {(() => {
+                          // Only calculate total for numeric decks
+                          if (selectedSession.deckType === 'fibonacci' || selectedSession.deckType === 'powers') {
+                            const total = selectedSession.stories
+                              .filter(s => s.isEstimated && s.estimate && s.estimate !== '?')
+                              .reduce((sum, s) => {
+                                const points = parseFloat(s.estimate || '0')
+                                return isNaN(points) ? sum : sum + points
+                              }, 0)
+                            return total || '0'
+                          } else {
+                            // For non-numeric decks, show estimated count
+                            return selectedSession.stories.filter(s => s.isEstimated).length
+                          }
+                        })()}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {selectedSession.deckType === 'fibonacci' || selectedSession.deckType === 'powers' ? 'Total Points' : 'Estimated'}
+                      </div>
+                    </div>
+
+                    {/* Average Story Size or Most Common */}
+                    <div className="text-center p-3 border rounded">
+                      <div className="text-xl font-semibold">
+                        {(() => {
+                          if (selectedSession.deckType === 'fibonacci' || selectedSession.deckType === 'powers') {
+                            // For numeric decks, calculate average
+                            const estimatedStories = selectedSession.stories.filter(s => 
+                              s.isEstimated && s.estimate && s.estimate !== '?' && !isNaN(parseFloat(s.estimate))
+                            )
+                            if (estimatedStories.length === 0) return '—'
+                            const avg = estimatedStories.reduce((sum, s) => sum + parseFloat(s.estimate!), 0) / estimatedStories.length
+                            return avg.toFixed(1)
+                          } else if (selectedSession.deckType === 'tshirt') {
+                            // For T-shirt sizes, show most common size
+                            const estimates = selectedSession.stories
+                              .filter(s => s.isEstimated && s.estimate && s.estimate !== '?')
+                              .map(s => s.estimate!)
+                            if (estimates.length === 0) return '—'
+                            const counts: Record<string, number> = {}
+                            estimates.forEach(e => counts[e] = (counts[e] || 0) + 1)
+                            const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1])
+                            return sorted[0]?.[0] || '—'
+                          } else {
+                            // For custom decks, show remaining count
+                            return selectedSession.stories.filter(s => !s.isEstimated).length
+                          }
+                        })()}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {selectedSession.deckType === 'fibonacci' || selectedSession.deckType === 'powers' ? 'Avg Points' : 
+                         selectedSession.deckType === 'tshirt' ? 'Most Common' : 'Remaining'}
+                      </div>
+                    </div>
+
+                    {/* Consensus Rate */}
+                    <div className="text-center p-3 border rounded">
+                      <div className="text-xl font-semibold">
+                        {(() => {
+                          const storiesWithVoting = selectedSession.stories.filter(s => s.votingHistory && s.votingHistory.length > 0)
+                          if (storiesWithVoting.length === 0) return '—'
+                          const firstRoundConsensus = storiesWithVoting.filter(s => s.votingHistory!.length === 1).length
+                          return `${Math.round((firstRoundConsensus / storiesWithVoting.length) * 100)}%`
+                        })()}
+                      </div>
+                      <div className="text-xs text-muted-foreground">First-Round Consensus</div>
+                    </div>
+
+                    {/* Session Duration */}
+                    <div className="text-center p-3 border rounded">
+                      <div className="text-xl font-semibold">
+                        {(() => {
+                          const sessionStart = selectedSession.createdAt
+                          const sessionEnd = selectedSession.updatedAt
+                          const diffMs = sessionEnd.getTime() - sessionStart.getTime()
+                          const diffMins = Math.floor(diffMs / (1000 * 60))
+                          return `${diffMins}m`
+                        })()}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Duration</div>
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Participants */}
               <div className="border rounded p-4">
                 <h3 className="text-sm font-medium mb-3">Team Members</h3>
-                <div className="space-y-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {selectedSession.participants.map((participant) => (
-                    <div key={participant.id} className="flex items-center justify-between py-2 px-3 border rounded hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-2">
+                    <div key={participant.id} className="border rounded p-3 hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-2 mb-2">
                         <div className={`w-2 h-2 rounded-full ${
                           participant.isOnline ? 'bg-green-500' : 'bg-gray-400'
                         }`} />
-                        <span className="text-sm font-medium">{participant.name}</span>
+                        <span className="text-sm font-medium truncate">{participant.name}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">
+                          {participant.isOnline ? 'Online' : new Date(participant.lastSeen).toLocaleDateString()}
+                        </span>
                         {participant.isHost && (
                           <Badge variant="outline" className="text-xs px-1">Host</Badge>
                         )}
                       </div>
-                      <span className="text-xs text-muted-foreground">
-                        {participant.isOnline ? 'Online' : new Date(participant.lastSeen).toLocaleDateString()}
-                      </span>
                     </div>
                   ))}
                 </div>
@@ -943,14 +1075,24 @@ function PlanningContent() {
 
               {/* Stories */}
               <div className="border rounded p-4">
-                <h3 className="text-sm font-medium mb-3">User Stories</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-medium">User Stories</h3>
+                  {selectedSession.stories.length > 0 && (
+                    <Badge variant="outline" className="text-xs">
+                      {selectedSession.stories.length}
+                    </Badge>
+                  )}
+                </div>
+                
                 {selectedSession.stories.length > 0 ? (
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {selectedSession.stories.map((story) => (
+                  <div className="space-y-3 max-h-80 overflow-y-auto">
+                    {selectedSession.stories.map((story, index) => (
                       <div key={story.id}>
                         <div 
-                          className={`flex items-start justify-between gap-4 p-3 border rounded cursor-pointer transition-all ${
-                            story.votingHistory && story.votingHistory.length > 0 ? 'hover:border-slate-300 dark:hover:border-slate-600' : ''
+                          className={`border rounded p-3 ${
+                            story.votingHistory && story.votingHistory.length > 0 
+                              ? 'hover:bg-muted/50 cursor-pointer' 
+                              : ''
                           }`}
                           onClick={() => {
                             if (story.votingHistory && story.votingHistory.length > 0) {
@@ -958,51 +1100,86 @@ function PlanningContent() {
                             }
                           }}
                         >
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-sm font-medium">{story.title}</h4>
-                            {story.description && (
-                              <p className="text-xs text-muted-foreground mt-1">{story.description}</p>
-                            )}
-                            {story.votingHistory && story.votingHistory.length > 0 && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {story.votingHistory.length} voting round{story.votingHistory.length !== 1 ? 's' : ''} • Click to view
-                              </p>
-                            )}
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start gap-2">
+                                <span className="flex-shrink-0 text-xs text-muted-foreground font-mono mt-0.5">
+                                  {index + 1}.
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-sm font-medium mb-1">
+                                    {story.title}
+                                  </h4>
+                                  {story.description && (
+                                    <p className="text-xs text-muted-foreground mb-2">
+                                      {story.description}
+                                    </p>
+                                  )}
+                                  {story.votingHistory && story.votingHistory.length > 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {story.votingHistory.length} round{story.votingHistory.length !== 1 ? 's' : ''} • Click to view
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <Badge 
+                              variant={story.isEstimated ? "default" : "outline"} 
+                              className="text-xs shrink-0"
+                            >
+                              {story.isEstimated ? story.estimate : "—"}
+                            </Badge>
                           </div>
-                          <Badge variant={story.isEstimated ? "default" : "outline"} className="shrink-0 text-xs">
-                            {story.isEstimated ? story.estimate : "—"}
-                          </Badge>
                         </div>
 
                         {/* Expanded voting history */}
                         {expandedStory === story.id && story.votingHistory && story.votingHistory.length > 0 && (
-                          <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border">
-                            <h5 className="font-medium mb-2 text-xs">Voting History</h5>
-                            <div className="space-y-2">
-                              {story.votingHistory.map((round, index) => (
-                                <div key={round.id} className="bg-white dark:bg-slate-800 rounded p-2">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="text-xs font-medium text-muted-foreground">
-                                      Round {index + 1} • {round.timestamp.toLocaleString()}
-                                    </span>
-                                    {round.finalEstimate && (
-                                      <Badge variant="secondary" className="text-xs">
-                                        Final: {round.finalEstimate}
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <div className="flex flex-wrap gap-1">
-                                    {Object.entries(round.votes).map(([participantId, vote]) => (
-                                      <div key={participantId} className="flex items-center gap-1 text-xs">
-                                        <span className="text-muted-foreground">
-                                          {round.participantNames[participantId] || 'Unknown'}:
+                          <div className="mt-3 border-t pt-3">
+                            <div className="bg-muted/30 rounded-lg p-4">
+                              <h5 className="text-sm font-medium mb-3 flex items-center gap-2">
+                                <span>Voting History</span>
+                                <Badge variant="outline" className="text-xs">
+                                  {story.votingHistory.length} round{story.votingHistory.length !== 1 ? 's' : ''}
+                                </Badge>
+                              </h5>
+                              
+                              <div className="space-y-3">
+                                {story.votingHistory.map((round, roundIndex) => (
+                                  <div key={round.id} className="bg-background border rounded-lg p-3">
+                                    {/* Round header */}
+                                    <div className="flex items-center justify-between mb-3 pb-2 border-b">
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs font-mono bg-muted rounded px-2 py-1">
+                                          #{roundIndex + 1}
                                         </span>
-                                        <span className="font-mono text-xs">{vote}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                          {round.timestamp.toLocaleString()}
+                                        </span>
                                       </div>
-                                    ))}
+                                      {round.finalEstimate && (
+                                        <Badge variant="default" className="text-xs">
+                                          {round.finalEstimate}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    
+                                    {/* Votes grid */}
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                      {Object.entries(round.votes).map(([participantId, vote]) => (
+                                        <div key={participantId} className="flex items-center justify-between bg-muted/50 rounded px-3 py-2">
+                                          <span className="text-xs font-medium truncate mr-2">
+                                            {round.participantNames[participantId] || 'Unknown'}
+                                          </span>
+                                          <span className="text-xs font-mono bg-background border rounded px-2 py-0.5">
+                                            {vote}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                ))}
+                              </div>
                             </div>
                           </div>
                         )}
@@ -1010,10 +1187,12 @@ function PlanningContent() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-4 text-sm text-muted-foreground">
+                  <div className="text-center py-6 text-sm text-muted-foreground">
                     No user stories were added to this session
                   </div>
                 )}
+              </div>
+                </div>
               </div>
             </div>
           )}

@@ -17,9 +17,20 @@ service cloud.firestore {
       allow delete: if request.auth != null;
     }
     
+    // Session stories collection (separate from sessions)
+    match /sessionStories/{sessionId} {
+      // Allow anyone to read/write session stories subcollections
+      allow read, write: if true;
+      
+      match /stories/{storyId} {
+        // Allow anyone to read/write individual session stories  
+        allow read, write: if true;
+      }
+    }
+    
     // Helper function to check if this is just a participant update
     function isParticipantOnlyUpdate() {
-      let allowedFields = ['participants', 'updatedAt'];
+      let allowedFields = ['participants', 'updatedAt', 'stories', 'metrics', 'isActive', 'votingInProgress', 'votesRevealed', 'currentStoryId'];
       let changedFields = request.resource.data.diff(resource.data).changedKeys();
       
       // Check if only allowed fields are being changed

@@ -6,12 +6,10 @@ import {
   deleteDoc, 
   onSnapshot, 
   serverTimestamp,
-  Timestamp,
   query,
   collection,
   where,
   orderBy,
-  limit,
   getDocs
 } from 'firebase/firestore'
 import { db } from './firebase'
