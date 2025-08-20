@@ -21,12 +21,21 @@ import type { Story, Epic, StoryTemplate,  Comment, Attachment } from '@/types/s
 import { updateEpicStoryCounts } from './epic-service'
 
 // Firestore document types for proper timestamp handling
-interface FirestoreStory extends Omit<Story, 'createdAt' | 'updatedAt' | 'startedAt' | 'completedAt' | 'lastDiscussion'> {
+interface FirestoreStory extends Omit<Story, 'createdAt' | 'updatedAt' | 'startedAt' | 'completedAt' | 'lastDiscussion' | 'comments'> {
   createdAt: { toDate(): Date } | Date
   updatedAt: { toDate(): Date } | Date
   startedAt?: { toDate(): Date } | Date | null
   completedAt?: { toDate(): Date } | Date | null
   lastDiscussion?: { toDate(): Date } | Date | null
+  comments: Array<{
+    id: string
+    text: string
+    authorId: string
+    authorName: string
+    createdAt: { toDate(): Date } | Date
+    type: 'comment' | 'status_change' | 'assignment' | 'estimate_change'
+    mentions?: string[]
+  }>
 }
 
 interface FirestoreTemplate extends Omit<StoryTemplate, 'createdAt' | 'lastUsed'> {
@@ -46,10 +55,7 @@ function convertFirestoreStory(doc: FirestoreStory): Story {
     // Convert comment timestamps
     comments: doc.comments?.map(comment => ({
       ...comment,
-      createdAt: comment.createdAt instanceof Date ? comment.createdAt : 
-        (comment.createdAt && 'toDate' in comment.createdAt && typeof comment.createdAt.toDate === 'function' 
-          ? comment.createdAt.toDate() 
-          : new Date())
+      createdAt: comment.createdAt instanceof Date ? comment.createdAt : comment.createdAt.toDate()
     })) || []
   } as Story
 }
