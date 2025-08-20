@@ -3,7 +3,7 @@
 import React, { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/contexts/AuthContext"
-import { getSessionsByProject } from "@/lib/session-service"
+import { getSessionsByProject, deleteSession } from "@/lib/session-service"
 import { getProjectsByOwner } from "@/lib/project-service"
 import { subscribeToProjectEpics } from "@/lib/epic-service"
 import { getStoriesByProject } from "@/lib/story-service"
@@ -42,7 +42,8 @@ import {
   Activity,
   Award,
   AlertCircle,
-  Clock
+  Clock,
+  Trash2
 } from "lucide-react"
 import Link from "next/link"
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader"
@@ -92,6 +93,10 @@ function PlanningContent() {
   const [filterBy, setFilterBy] = useState<'all' | 'active' | 'ended'>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const sessionsPerPage = 5
+  
+  // Delete confirmation state
+  const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     // Redirect to login if not authenticated
@@ -308,6 +313,35 @@ function PlanningContent() {
   const showSessionDetails = (session: Session) => {
     setSelectedSession(session)
     setShowDetailsModal(true)
+  }
+
+  const handleDeleteSession = (session: Session) => {
+    setSessionToDelete(session)
+  }
+
+  const confirmDeleteSession = async () => {
+    if (!sessionToDelete) return
+
+    setIsDeleting(true)
+    try {
+      await deleteSession(sessionToDelete.id)
+      
+      // Remove session from local state
+      setSessions(prev => prev.filter(s => s.id !== sessionToDelete.id))
+      
+      // Close dialog
+      setSessionToDelete(null)
+      
+    } catch (error) {
+      console.error('Failed to delete session:', error)
+      // You could add a toast notification here
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const cancelDeleteSession = () => {
+    setSessionToDelete(null)
   }
 
   // Filter and sort sessions
@@ -677,22 +711,44 @@ function PlanningContent() {
                             })}</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 sm:flex-shrink-0">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto sm:flex-shrink-0">
                           {session.isActive ? (
-                            <Button variant="outline" size="sm" className="w-full sm:w-auto" asChild>
-                              <Link href={`/session/${session.id}`}>
-                                Rejoin
-                              </Link>
-                            </Button>
+                            <>
+                              <Button variant="outline" size="sm" className="flex-1 sm:flex-initial" asChild>
+                                <Link href={`/session/${session.id}`}>
+                                  Rejoin
+                                </Link>
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleDeleteSession(session)}
+                                className="flex-1 sm:flex-initial text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2 sm:mr-0" />
+                                <span className="sm:hidden">Delete</span>
+                              </Button>
+                            </>
                           ) : (
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="w-full sm:w-auto" 
-                              onClick={() => showSessionDetails(session)}
-                            >
-                              View Details
-                            </Button>
+                            <>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="flex-1 sm:flex-initial" 
+                                onClick={() => showSessionDetails(session)}
+                              >
+                                View Details
+                              </Button>
+                              <Button 
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteSession(session)}
+                                className="flex-1 sm:flex-initial text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2 sm:mr-0" />
+                                <span className="sm:hidden">Delete</span>
+                              </Button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -825,7 +881,7 @@ function PlanningContent() {
                 <span>•</span>
                 <span>{selectedSession?.createdAt && new Date(selectedSession.createdAt).toLocaleDateString()}</span>
               </div>
-              <DialogDescription className="text-xs mt-2 max-h-32 overflow-y-auto">
+              <DialogDescription className="text-xs mt-2 max-h-32 overflow-y-auto hidden sm:block">
                 {selectedSession?.description || "View comprehensive metrics, team members, and user stories from this planning session."}
               </DialogDescription>
             </div>
@@ -834,7 +890,7 @@ function PlanningContent() {
           {selectedSession && (
             <div className="flex-1 overflow-hidden">
               <div className="h-[70vh] sm:h-[75vh] overflow-y-auto pr-2">
-                <div className="space-y-6 pt-6">
+                <div className="space-y-6 pt-6 pb-6">
               {/* Display comprehensive metrics if available, otherwise show basic stats */}
               {selectedSession.metrics ? (
                 <>
@@ -1198,6 +1254,42 @@ function PlanningContent() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      {sessionToDelete && (
+        <Dialog open={!!sessionToDelete} onOpenChange={cancelDeleteSession}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Delete Session</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete "{sessionToDelete.name}"? This action cannot be undone and will permanently remove the session and all its data including stories and voting history.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-3 mt-6">
+              <Button variant="outline" onClick={cancelDeleteSession} disabled={isDeleting}>
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={confirmDeleteSession}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

@@ -43,6 +43,12 @@ function convertFirestoreStory(doc: FirestoreStory): Story {
     startedAt: doc.startedAt instanceof Date ? doc.startedAt : doc.startedAt?.toDate() || undefined,
     completedAt: doc.completedAt instanceof Date ? doc.completedAt : doc.completedAt?.toDate() || undefined,
     lastDiscussion: doc.lastDiscussion instanceof Date ? doc.lastDiscussion : doc.lastDiscussion?.toDate() || undefined,
+    // Convert comment timestamps
+    comments: doc.comments?.map(comment => ({
+      ...comment,
+      createdAt: comment.createdAt instanceof Date ? comment.createdAt : 
+        (comment.createdAt && typeof comment.createdAt.toDate === 'function' ? comment.createdAt.toDate() : new Date())
+    })) || []
   } as Story
 }
 
@@ -412,6 +418,24 @@ export async function addStoryComment(storyId: string, comment: Omit<Comment, 'i
   }
 }
 
+// Delete comment from story
+export async function deleteStoryComment(storyId: string, commentId: string): Promise<void> {
+  try {
+    const story = await getStory(storyId)
+    if (!story) return
+
+    const updatedComments = story.comments.filter(comment => comment.id !== commentId)
+
+    await updateStory(storyId, {
+      comments: updatedComments,
+      lastDiscussion: new Date()
+    })
+  } catch (error) {
+    console.error('Error deleting story comment:', error)
+    throw new Error('Failed to delete comment')
+  }
+}
+
 // === STORY ATTACHMENTS ===
 
 // Add attachment to story
@@ -524,4 +548,5 @@ export async function getProjectStoryStats(projectId: string): Promise<{
     }
   }
 }
+
 

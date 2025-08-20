@@ -715,10 +715,36 @@ export async function cleanupInactiveParticipants(sessionId: string): Promise<vo
   }
 }
 
-// Delete session
+// Delete session and all associated data
 export async function deleteSession(sessionId: string): Promise<void> {
-  const sessionRef = doc(db, 'sessions', sessionId)
-  await deleteDoc(sessionRef)
+  try {
+    // Delete session stories from sessionStories subcollection
+    const storiesRef = collection(db, 'sessionStories', sessionId, 'stories')
+    const storiesSnapshot = await getDocs(storiesRef)
+    
+    // Use batch delete for better performance
+    const batch = writeBatch(db)
+    
+    // Add all story deletions to batch
+    storiesSnapshot.docs.forEach((storyDoc) => {
+      batch.delete(storyDoc.ref)
+    })
+    
+    // Delete the main session document
+    const sessionRef = doc(db, 'sessions', sessionId)
+    batch.delete(sessionRef)
+    
+    // Delete the sessionStories parent document if it exists
+    const sessionStoriesRef = doc(db, 'sessionStories', sessionId)
+    batch.delete(sessionStoriesRef)
+    
+    // Commit all deletions
+    await batch.commit()
+    
+  } catch (error) {
+    console.error('Error deleting session and associated data:', error)
+    throw new Error('Failed to delete session')
+  }
 }
 
 // Helper function to fetch stories for a session from the separate collection

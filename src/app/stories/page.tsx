@@ -27,6 +27,7 @@ import {
   FlaskConical,
   Edit,
   Trash2,
+  Eye,
   MoreHorizontal,
   GripVertical,
   X,
@@ -43,6 +44,7 @@ import {
   Building2,
   Lock
 } from "lucide-react"
+import { StoryDetailModal } from "@/components/StoryDetailModal"
 
 // Icon component map for rendering epic icons
 const IconMap = {
@@ -110,11 +112,13 @@ const StoryCardContent = React.memo(function StoryCardContent({
   story, 
   onEdit, 
   onDelete,
+  onViewDetails,
   isDeleting
 }: {
   story: Story
   onEdit: (story: Story) => void
   onDelete: (story: Story) => void
+  onViewDetails: (story: Story) => void
   isDeleting: boolean
 }) {
   const getTypeIcon = useCallback((type: string) => {
@@ -153,6 +157,10 @@ const StoryCardContent = React.memo(function StoryCardContent({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onViewDetails(story)}>
+              <Eye className="mr-2 h-4 w-4" />
+              View Details
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onEdit(story)}>
               <Edit className="mr-2 h-4 w-4" />
               Edit
@@ -197,10 +205,11 @@ interface StoryCardProps {
   story: Story
   onEdit: (story: Story) => void
   onDelete: (story: Story) => void
+  onViewDetails: (story: Story) => void
   isDeleting: boolean
 }
 
-const StoryCard = function StoryCard({ story, onEdit, onDelete, isDeleting }: StoryCardProps) {
+const StoryCard = function StoryCard({ story, onEdit, onDelete, onViewDetails, isDeleting }: StoryCardProps) {
   const {
     attributes,
     listeners,
@@ -230,6 +239,7 @@ const StoryCard = function StoryCard({ story, onEdit, onDelete, isDeleting }: St
         story={story} 
         onEdit={onEdit} 
         onDelete={onDelete}
+        onViewDetails={onViewDetails}
         isDeleting={isDeleting}
       />
     </div>
@@ -242,11 +252,12 @@ interface DroppableColumnProps {
   stories: Story[]
   onEdit: (story: Story) => void
   onDelete: (story: Story) => void
+  onViewDetails: (story: Story) => void
   isDeleting: boolean
   deletingStoryId: string
 }
 
-const DroppableColumn = React.memo(function DroppableColumn({ column, stories, onEdit, onDelete, isDeleting, deletingStoryId }: DroppableColumnProps) {
+const DroppableColumn = React.memo(function DroppableColumn({ column, stories, onEdit, onDelete, onViewDetails, isDeleting, deletingStoryId }: DroppableColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
   })
@@ -282,6 +293,7 @@ const DroppableColumn = React.memo(function DroppableColumn({ column, stories, o
                   story={story}
                   onEdit={onEdit}
                   onDelete={onDelete}
+                  onViewDetails={onViewDetails}
                   isDeleting={isDeleting && deletingStoryId === story.id}
                 />
               ))}
@@ -334,6 +346,10 @@ function StoriesContent() {
   // Drag and drop state
   const [activeStory, setActiveStory] = useState<Story | null>(null)
   const [isDraggedOver, setIsDraggedOver] = useState<string | null>(null)
+  
+  // Modal state
+  const [selectedStoryForDetails, setSelectedStoryForDetails] = useState<Story | null>(null)
+  const [showStoryDetailsModal, setShowStoryDetailsModal] = useState(false)
   
   // Drag sensors - mobile & desktop optimized
   const sensors = useSensors(
@@ -527,6 +543,16 @@ function StoriesContent() {
   const handleEditStory = (story: Story) => {
     setEditingStory(story)
     setIsEditModalOpen(true)
+  }
+
+  const handleViewStoryDetails = (story: Story) => {
+    setSelectedStoryForDetails(story)
+    setShowStoryDetailsModal(true)
+  }
+
+  const handleCloseStoryDetailsModal = () => {
+    setShowStoryDetailsModal(false)
+    setSelectedStoryForDetails(null)
   }
 
   const handleCloseEditModal = () => {
@@ -964,6 +990,7 @@ function StoriesContent() {
                   stories={storiesByStatus[column.id] || []}
                   onEdit={handleEditStory}
                   onDelete={handleDeleteStoryClick}
+                  onViewDetails={handleViewStoryDetails}
                   isDeleting={isDeleting}
                   deletingStoryId={deletingStoryId}
                 />
@@ -978,6 +1005,7 @@ function StoriesContent() {
                     story={activeStory} 
                     onEdit={() => {}} 
                     onDelete={() => {}}
+                    onViewDetails={() => {}}
                     isDeleting={false}
                   />
                 </div>
@@ -1061,6 +1089,22 @@ function StoriesContent() {
           </div>
         </div>
       )}
+
+      {/* Story Detail Modal */}
+      <StoryDetailModal
+        story={selectedStoryForDetails ? stories.find(s => s.id === selectedStoryForDetails.id) || selectedStoryForDetails : null}
+        isOpen={showStoryDetailsModal}
+        onClose={handleCloseStoryDetailsModal}
+        onEdit={selectedStoryForDetails ? () => {
+          const currentStory = stories.find(s => s.id === selectedStoryForDetails.id) || selectedStoryForDetails
+          handleCloseStoryDetailsModal()
+          handleEditStory(currentStory)
+        } : undefined}
+        onStoryUpdated={() => {
+          // Real-time subscription will handle updates automatically
+          // Modal will show fresh data on next render
+        }}
+      />
     </div>
   )
 }

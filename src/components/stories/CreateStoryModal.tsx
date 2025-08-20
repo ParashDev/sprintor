@@ -684,7 +684,7 @@ export default function CreateStoryModal({
                         />
                       </div>
                       <div>
-                        <Label htmlFor="type">Type</Label>
+                        <Label>Type</Label>
                         <Select 
                           value={selectData.type}
                           onValueChange={(value) => setSelectData(prev => ({...prev, type: value as typeof selectData.type}))}
@@ -701,7 +701,7 @@ export default function CreateStoryModal({
                         </Select>
                       </div>
                       <div>
-                        <Label htmlFor="selected-epic">Selected Epic</Label>
+                        <Label>Selected Epic</Label>
                         <div className="mt-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-input">
                           {selectedEpicId === "no-epic" ? (
                             <span className="text-sm text-muted-foreground">No Epic Selected</span>
@@ -728,7 +728,7 @@ export default function CreateStoryModal({
                         <p className="text-xs text-muted-foreground mt-1">Epic was selected during template selection</p>
                       </div>
                       <div>
-                        <Label htmlFor="priority">Priority</Label>
+                        <Label>Priority</Label>
                         <Select 
                           value={selectData.priority}
                           onValueChange={(value) => setSelectData(prev => ({...prev, priority: value as typeof selectData.priority}))}
@@ -808,7 +808,7 @@ export default function CreateStoryModal({
                           />
                         </div>
                         <div>
-                          <Label htmlFor="riskLevel">Risk Level</Label>
+                          <Label>Risk Level</Label>
                           <Select 
                             value={selectData.riskLevel}
                             onValueChange={(value) => setSelectData(prev => ({...prev, riskLevel: value as typeof selectData.riskLevel}))}
@@ -825,7 +825,7 @@ export default function CreateStoryModal({
                           </Select>
                         </div>
                         <div>
-                          <Label htmlFor="complexity">Complexity</Label>
+                          <Label>Complexity</Label>
                           <Select 
                             value={selectData.complexity}
                             onValueChange={(value) => setSelectData(prev => ({...prev, complexity: value as typeof selectData.complexity}))}
@@ -871,7 +871,7 @@ export default function CreateStoryModal({
                           />
                         </div>
                         <div>
-                          <Label htmlFor="confidence">Confidence</Label>
+                          <Label>Confidence</Label>
                           <Select 
                             value={selectData.estimationConfidence}
                             onValueChange={(value) => setSelectData(prev => ({...prev, estimationConfidence: value as typeof selectData.estimationConfidence}))}
