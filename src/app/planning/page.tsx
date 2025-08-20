@@ -1262,7 +1262,7 @@ function PlanningContent() {
             <DialogHeader>
               <DialogTitle>Delete Session</DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete "{sessionToDelete.name}"? This action cannot be undone and will permanently remove the session and all its data including stories and voting history.
+                Are you sure you want to delete &quot;{sessionToDelete.name}&quot;? This action cannot be undone and will permanently remove the session and all its data including stories and voting history.
               </DialogDescription>
             </DialogHeader>
             <div className="flex justify-end gap-3 mt-6">
