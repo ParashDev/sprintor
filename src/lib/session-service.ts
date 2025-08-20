@@ -620,15 +620,6 @@ export async function endSession(sessionId: string): Promise<void> {
   })
   
 
-  // Prepare update data with proper field validation
-  const updateData = {
-    isActive: false,
-    participants: cleanParticipantsForFirestore(updatedParticipants),
-    stories: preservedStories, // Explicitly preserve stories
-    metrics: cleanMetrics, // Store the cleaned metrics object
-    updatedAt: serverTimestamp()
-  }
-
 
   const sessionRef = doc(db, 'sessions', sessionId)
   
@@ -658,7 +649,7 @@ export async function endSession(sessionId: string): Promise<void> {
     console.error('💀 DETAILED Error ending session:', {
       error: error,
       errorMessage: error instanceof Error ? error.message : 'Unknown error',
-      errorCode: (error as any)?.code || 'Unknown code',
+      errorCode: (error as { code?: string })?.code || 'Unknown code',
       errorName: error instanceof Error ? error.name : 'Unknown name',
       sessionId: sessionId,
       storiesCount: preservedStories.length
