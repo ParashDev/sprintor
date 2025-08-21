@@ -132,7 +132,7 @@ export function useSprintCollaboration(
     setConnectionStatus('connecting')
 
     // Subscribe to sprint updates
-    const sprintUnsubscribe = subscribeToSprint(sprintId, (updatedSprint) => {
+    const sprintUnsubscribe = subscribeToSprint(sprintId!, (updatedSprint) => {
       if (updatedSprint) {
         setSprint(updatedSprint)
         setParticipants(updatedSprint.participants)
@@ -158,7 +158,7 @@ export function useSprintCollaboration(
   useEffect(() => {
     if (!isInitialized || !isValid) return
 
-    const activitiesUnsubscribe = subscribeToSprintActivities(sprintId, (newActivities) => {
+    const activitiesUnsubscribe = subscribeToSprintActivities(sprintId!, (newActivities) => {
       setActivities(newActivities)
     })
 
@@ -177,8 +177,8 @@ export function useSprintCollaboration(
     if (!isInitialized || !sprint || !isValid || connectionStatus !== 'connected') return
 
     const participant: SprintParticipant = {
-      id: participantId,
-      name: participantName,
+      id: participantId!,
+      name: participantName!,
       color: generateParticipantColor(),
       isActive: true,
       joinedAt: new Date(),
@@ -188,7 +188,7 @@ export function useSprintCollaboration(
     participantRef.current = participant
 
     // Add participant to sprint
-    addSprintParticipant(sprintId, participant).catch(error => {
+    addSprintParticipant(sprintId!, participant).catch(error => {
       console.error('Error adding participant:', error)
       setError('Failed to join sprint')
     })
@@ -202,12 +202,12 @@ export function useSprintCollaboration(
     // Send heartbeat every 30 seconds
     const sendHeartbeat = async () => {
       try {
-        await refreshAccessToken(accessToken)
+        await refreshAccessToken(accessToken!)
         
         // Update participant last seen
         if (participantRef.current && sprint) {
           const updatedParticipants = sprint.participants.map(p => 
-            p.id === participantId 
+            p.id === participantId! 
               ? { ...p, lastSeen: new Date(), isActive: true }
               : p
           )
@@ -247,7 +247,7 @@ export function useSprintCollaboration(
     cursorUpdateTimeoutRef.current = setTimeout(() => {
       if (participantRef.current && sprint) {
         const updatedParticipants = sprint.participants.map(p => 
-          p.id === participantId 
+          p.id === participantId! 
             ? { 
                 ...p, 
                 cursor: { x, y, cardId },
@@ -266,7 +266,7 @@ export function useSprintCollaboration(
     try {
       // Remove participant from sprint
       if (sprint && participantRef.current) {
-        await removeSprintParticipant(sprintId, participantId)
+        await removeSprintParticipant(sprintId!, participantId!)
       }
 
       // Clean up subscriptions
@@ -331,7 +331,7 @@ export function useSprintCollaboration(
         // Page is hidden - mark participant as inactive
         if (participantRef.current && sprint) {
           const updatedParticipants = sprint.participants.map(p => 
-            p.id === participantId 
+            p.id === participantId! 
               ? { ...p, isActive: false, lastSeen: new Date() }
               : p
           )
@@ -341,7 +341,7 @@ export function useSprintCollaboration(
         // Page is visible again - mark participant as active
         if (participantRef.current && sprint) {
           const updatedParticipants = sprint.participants.map(p => 
-            p.id === participantId 
+            p.id === participantId! 
               ? { ...p, isActive: true, lastSeen: new Date() }
               : p
           )
