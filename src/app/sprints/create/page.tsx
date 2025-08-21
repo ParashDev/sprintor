@@ -618,7 +618,7 @@ export default function CreateSprintPage() {
                   ) : availableStories.length === 0 ? (
                     <div className="text-center py-8">
                       <p className="text-slate-600 dark:text-slate-400">
-                        No sprint-ready stories found. Make sure you have stories in "Sprint Ready" status.
+                        No sprint-ready stories found. Make sure you have stories in &quot;Sprint Ready&quot; status.
                       </p>
                     </div>
                   ) : (

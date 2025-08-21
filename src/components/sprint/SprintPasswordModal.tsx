@@ -303,7 +303,7 @@ export function SprintPasswordModal({
         {/* Footer */}
         <div className="px-6 py-4 bg-slate-50 dark:bg-slate-750 rounded-b-xl border-t border-slate-200 dark:border-slate-700">
           <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
-            By joining this sprint, you agree to collaborate respectfully and follow the team's working agreements.
+            By joining this sprint, you agree to collaborate respectfully and follow the team&apos;s working agreements.
           </p>
         </div>
       </div>

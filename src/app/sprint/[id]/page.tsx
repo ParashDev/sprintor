@@ -34,7 +34,7 @@ export default function SprintPage() {
       accessToken,
       participantId,
       participantName
-    } : null as any
+    } : null
   )
 
   // Load sprint data on page load
