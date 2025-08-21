@@ -406,7 +406,7 @@ export async function joinSprint(request: JoinSprintRequest): Promise<{ success:
     const accessRecord: SprintAccess = {
       sprintId: request.sprintId,
       participantId: Math.random().toString(36).substring(2, 9),
-      accessLevel: request.role || 'viewer',
+      accessLevel: request.role === 'contributor' ? 'contribute' : 'view',
       passwordRequired: !sprint.allowGuestAccess,
       sessionToken: accessToken,
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
