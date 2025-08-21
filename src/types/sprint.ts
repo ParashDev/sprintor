@@ -236,7 +236,7 @@ export interface SprintActivity {
 }
 
 // Firestore Document Types (for proper timestamp handling)
-export interface FirestoreSprint extends Omit<Sprint, 'createdAt' | 'updatedAt' | 'lastActivity' | 'startDate' | 'endDate' | 'stories' | 'burndownData'> {
+export interface FirestoreSprint extends Omit<Sprint, 'createdAt' | 'updatedAt' | 'lastActivity' | 'startDate' | 'endDate' | 'stories' | 'burndownData' | 'members' | 'participants'> {
   createdAt: { toDate(): Date } | Date
   updatedAt: { toDate(): Date } | Date
   lastActivity: { toDate(): Date } | Date
@@ -244,15 +244,18 @@ export interface FirestoreSprint extends Omit<Sprint, 'createdAt' | 'updatedAt' 
   endDate: { toDate(): Date } | Date
   stories: FirestoreSprintStory[]
   burndownData: FirestoreBurndownPoint[]
+  members: FirestoreSprintMember[]
+  participants: FirestoreSprintParticipant[]
 }
 
-export interface FirestoreSprintStory extends Omit<SprintStory, 'addedToSprintAt' | 'startedAt' | 'completedAt' | 'lastUpdated'> {
+export interface FirestoreSprintStory extends Omit<SprintStory, 'addedToSprintAt' | 'startedAt' | 'completedAt' | 'lastUpdated' | 'sprintComments' | 'statusHistory' | 'blockers'> {
   addedToSprintAt: { toDate(): Date } | Date
   startedAt?: { toDate(): Date } | Date | null
   completedAt?: { toDate(): Date } | Date | null
   lastUpdated: { toDate(): Date } | Date
   sprintComments: FirestoreSprintComment[]
   statusHistory: FirestoreStatusChange[]
+  blockers: FirestoreSprintBlocker[]
 }
 
 export interface FirestoreSprintComment extends Omit<SprintComment, 'createdAt'> {
@@ -263,8 +266,23 @@ export interface FirestoreStatusChange extends Omit<StatusChange, 'timestamp'> {
   timestamp: { toDate(): Date } | Date
 }
 
+export interface FirestoreSprintBlocker extends Omit<SprintBlocker, 'createdAt' | 'resolvedAt'> {
+  createdAt: { toDate(): Date } | Date
+  resolvedAt?: { toDate(): Date } | Date | null
+}
+
 export interface FirestoreBurndownPoint extends Omit<BurndownPoint, 'date'> {
   date: { toDate(): Date } | Date
+}
+
+export interface FirestoreSprintMember extends Omit<SprintMember, 'joinedAt' | 'lastSeen'> {
+  joinedAt: { toDate(): Date } | Date
+  lastSeen: { toDate(): Date } | Date
+}
+
+export interface FirestoreSprintParticipant extends Omit<SprintParticipant, 'joinedAt' | 'lastSeen'> {
+  joinedAt: { toDate(): Date } | Date
+  lastSeen: { toDate(): Date } | Date
 }
 
 // API Request/Response Types
