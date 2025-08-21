@@ -385,13 +385,24 @@ export async function getEpicsByProject(projectId: string): Promise<Epic[]> {
     
     querySnapshot.forEach((doc) => {
       const data = doc.data()
-      epics.push({
-        ...(data as any),
+      const epic: Epic = {
+        id: doc.id,
+        name: data.name || '',
+        description: data.description || '',
+        projectId: data.projectId || '',
+        color: data.color || '#64748b',
+        icon: data.icon,
+        status: data.status || 'planning',
+        acceptanceCriteria: data.acceptanceCriteria || [],
+        storyCount: data.storyCount || 0,
+        completedStoryCount: data.completedStoryCount || 0,
         createdAt: data.createdAt?.toDate() || new Date(),
         updatedAt: data.updatedAt?.toDate() || new Date(),
-        startDate: data.startDate?.toDate() || undefined,
-        endDate: data.endDate?.toDate() || undefined,
-      } as Epic)
+        targetDate: data.targetDate?.toDate() || undefined,
+        ownerId: data.ownerId || '',
+        order: data.order
+      }
+      epics.push(epic)
     })
     
     return epics
