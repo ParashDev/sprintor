@@ -53,8 +53,8 @@ export function useSprintCollaboration(
   const [isValid, setIsValid] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  const heartbeatIntervalRef = useRef<NodeJS.Timeout | undefined>()
-  const cursorUpdateTimeoutRef = useRef<NodeJS.Timeout | undefined>()
+  const heartbeatIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined)
+  const cursorUpdateTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const sprintUnsubscribeRef = useRef<(() => void) | null>(null)
   const activitiesUnsubscribeRef = useRef<(() => void) | null>(null)
   const participantRef = useRef<SprintParticipant | null>(null)
