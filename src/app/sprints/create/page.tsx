@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { 
   Calendar, 
@@ -21,7 +21,8 @@ import type { Story } from '@/types/story'
 import type { Epic } from '@/types/epic'
 import type { CreateSprintRequest } from '@/types/sprint'
 
-export default function CreateSprintPage() {
+// Component that uses useSearchParams - needs to be wrapped in Suspense
+function CreateSprintForm() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -732,5 +733,18 @@ export default function CreateSprintPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Main page component with Suspense boundary
+export default function CreateSprintPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-slate-900 dark:border-slate-100"></div>
+      </div>
+    }>
+      <CreateSprintForm />
+    </Suspense>
   )
 }
