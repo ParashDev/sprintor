@@ -236,7 +236,7 @@ export interface SprintActivity {
 }
 
 // Firestore Document Types (for proper timestamp handling)
-export interface FirestoreSprint extends Omit<Sprint, 'createdAt' | 'updatedAt' | 'lastActivity' | 'startDate' | 'endDate'> {
+export interface FirestoreSprint extends Omit<Sprint, 'createdAt' | 'updatedAt' | 'lastActivity' | 'startDate' | 'endDate' | 'stories' | 'burndownData'> {
   createdAt: { toDate(): Date } | Date
   updatedAt: { toDate(): Date } | Date
   lastActivity: { toDate(): Date } | Date
