@@ -386,7 +386,7 @@ export async function getEpicsByProject(projectId: string): Promise<Epic[]> {
     querySnapshot.forEach((doc) => {
       const data = doc.data()
       epics.push({
-        ...data,
+        ...(data as any),
         createdAt: data.createdAt?.toDate() || new Date(),
         updatedAt: data.updatedAt?.toDate() || new Date(),
         startDate: data.startDate?.toDate() || undefined,
