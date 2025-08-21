@@ -96,6 +96,12 @@ export function DashboardHeader() {
               >
                 Planning
               </Link>
+              <Link 
+                href="/sprints" 
+                className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+              >
+                Sprints
+              </Link>
 
               {mounted && (
                 <Button
@@ -225,6 +231,13 @@ export function DashboardHeader() {
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Planning
+                  </Link>
+                  <Link
+                    href="/sprints"
+                    className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-colors"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Sprints
                   </Link>
                 </nav>
 

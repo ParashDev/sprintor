@@ -17,7 +17,8 @@ import {
   type FieldValue
 } from 'firebase/firestore'
 import { db } from './firebase'
-import type { Story, Epic, StoryTemplate,  Comment, Attachment } from '@/types/story'
+import type { Story, StoryTemplate, Comment, Attachment } from '@/types/story'
+import type { Epic } from '@/types/epic'
 import { updateEpicStoryCounts } from './epic-service'
 
 // Firestore document types for proper timestamp handling

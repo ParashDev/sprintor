@@ -104,6 +104,43 @@ service cloud.firestore {
       allow delete: if request.auth != null;
     }
     
+    // Sprints collection
+    match /sprints/{sprintId} {
+      // Allow authenticated users to create sprints
+      allow create: if request.auth != null;
+      
+      // Allow anyone to read sprints (needed for password-protected access)
+      allow read: if true;
+      
+      // Allow authenticated users to update sprints they created OR participants to update
+      allow update: if request.auth != null 
+        || isSprintParticipantUpdate();
+      
+      // Allow authenticated users to delete sprints they created
+      allow delete: if request.auth != null && resource.data.hostId == request.auth.uid;
+    }
+    
+    // Sprint Access collection (for password-based access tokens)
+    match /sprintAccess/{accessToken} {
+      // Allow anyone to read/write sprint access tokens (needed for password verification)
+      allow read, write: if true;
+    }
+    
+    // Sprint Activities collection (for real-time collaboration)
+    match /sprintActivities/{activityId} {
+      // Allow anyone to read/write sprint activities (needed for real-time collaboration)
+      allow read, write: if true;
+    }
+    
+    // Helper function to check if this is a participant update to a sprint
+    function isSprintParticipantUpdate() {
+      let allowedFields = ['participants', 'stories', 'lastActivity', 'updatedAt'];
+      let changedFields = request.resource.data.diff(resource.data).changedKeys();
+      
+      // Check if only allowed fields are being changed
+      return changedFields.hasOnly(allowedFields);
+    }
+    
     // Helper function to check if user owns a project
     function isProjectOwner(projectId) {
       return projectId != null && 
