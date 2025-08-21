@@ -4,11 +4,19 @@ import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { getProjectsByOwner } from '@/lib/project-service'
-import { getSprintsByProject } from '@/lib/sprint-service'
+import { getSprintsByProject, updateSprint } from '@/lib/sprint-service'
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { X } from "lucide-react"
 import { 
   Plus, 
   Calendar, 
@@ -24,7 +32,10 @@ import {
   Copy,
   TrendingUp,
   Activity,
-  Timer
+  Timer,
+  MoreVertical,
+  Settings,
+  Archive
 } from 'lucide-react'
 import type { Sprint } from '@/types/sprint'
 import type { Project } from '@/lib/project-service'
@@ -39,6 +50,9 @@ export default function SprintsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [isLoading, setIsLoading] = useState(true)
+  const [startingSprints, setStartingSprints] = useState<Set<string>>(new Set())
+  const [editingSprintId, setEditingSprintId] = useState<string | null>(null)
+  const [editFormData, setEditFormData] = useState({ name: '', description: '', goal: '' })
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -146,6 +160,95 @@ export default function SprintsPage() {
     await navigator.clipboard.writeText(link)
     // You could add a toast notification here
     console.log('Sprint link copied to clipboard')
+  }
+
+  // Start sprint (change status from draft to active)
+  const startSprint = async (sprintId: string) => {
+    setStartingSprints(prev => new Set(prev).add(sprintId))
+    try {
+      await updateSprint(sprintId, { status: 'active' })
+      // Reload sprints to get updated data
+      if (selectedProject) {
+        const projectSprints = await getSprintsByProject(selectedProject)
+        setSprints(projectSprints)
+      }
+    } catch (error) {
+      console.error('Error starting sprint:', error)
+      // You could add a toast notification here for error
+    } finally {
+      setStartingSprints(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(sprintId)
+        return newSet
+      })
+    }
+  }
+
+  // Complete sprint (change status to completed)
+  const completeSprint = async (sprintId: string) => {
+    try {
+      await updateSprint(sprintId, { status: 'completed' })
+      // Reload sprints to get updated data
+      if (selectedProject) {
+        const projectSprints = await getSprintsByProject(selectedProject)
+        setSprints(projectSprints)
+      }
+    } catch (error) {
+      console.error('Error completing sprint:', error)
+    }
+  }
+
+  // Cancel sprint (change status to cancelled)
+  const cancelSprint = async (sprintId: string) => {
+    try {
+      await updateSprint(sprintId, { status: 'cancelled' })
+      // Reload sprints to get updated data
+      if (selectedProject) {
+        const projectSprints = await getSprintsByProject(selectedProject)
+        setSprints(projectSprints)
+      }
+    } catch (error) {
+      console.error('Error cancelling sprint:', error)
+    }
+  }
+
+  // Open edit modal
+  const openEditModal = (sprint: Sprint) => {
+    setEditingSprintId(sprint.id)
+    setEditFormData({
+      name: sprint.name,
+      description: sprint.description,
+      goal: sprint.goal
+    })
+  }
+
+  // Close edit modal
+  const closeEditModal = () => {
+    setEditingSprintId(null)
+    setEditFormData({ name: '', description: '', goal: '' })
+  }
+
+  // Save sprint edits
+  const saveSprintEdits = async () => {
+    if (!editingSprintId) return
+    
+    try {
+      await updateSprint(editingSprintId, {
+        name: editFormData.name,
+        description: editFormData.description,
+        goal: editFormData.goal
+      })
+      
+      // Reload sprints to get updated data
+      if (selectedProject) {
+        const projectSprints = await getSprintsByProject(selectedProject)
+        setSprints(projectSprints)
+      }
+      
+      closeEditModal()
+    } catch (error) {
+      console.error('Error updating sprint:', error)
+    }
   }
 
   // Format dates
@@ -399,6 +502,45 @@ export default function SprintsPage() {
                         >
                           <ExternalLink className="w-4 h-4" />
                         </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" title="More actions">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {sprint.status === 'draft' && (
+                              <DropdownMenuItem 
+                                onClick={() => startSprint(sprint.id)}
+                                disabled={startingSprints.has(sprint.id)}
+                              >
+                                {startingSprints.has(sprint.id) ? (
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b border-current mr-2" />
+                                ) : (
+                                  <Play className="mr-2 h-4 w-4" />
+                                )}
+                                {startingSprints.has(sprint.id) ? 'Starting...' : 'Start Sprint'}
+                              </DropdownMenuItem>
+                            )}
+                            {sprint.status === 'active' && (
+                              <>
+                                <DropdownMenuItem onClick={() => completeSprint(sprint.id)}>
+                                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                                  Complete Sprint
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => cancelSprint(sprint.id)}>
+                                  <Archive className="mr-2 h-4 w-4" />
+                                  Cancel Sprint
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                              </>
+                            )}
+                            <DropdownMenuItem onClick={() => openEditModal(sprint)}>
+                              <Settings className="mr-2 h-4 w-4" />
+                              Edit Sprint
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </CardHeader>
@@ -486,6 +628,74 @@ export default function SprintsPage() {
           </div>
         )}
       </main>
+      
+      {/* Edit Sprint Modal - Simple HTML/CSS */}
+      {editingSprintId && (
+        <div 
+          className="fixed inset-0 backdrop-blur-[1px] bg-black/5 flex items-center justify-center z-50"
+          onClick={closeEditModal}
+        >
+          <div 
+            className="bg-background border border-border rounded-lg shadow-lg max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <h2 className="text-lg font-semibold text-foreground">Edit Sprint</h2>
+              <button
+                onClick={closeEditModal}
+                className="p-1 hover:bg-accent rounded-full text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Sprint Name</label>
+                <input
+                  type="text"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Sprint name"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Description</label>
+                <textarea
+                  rows={3}
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Sprint description"
+                  className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Sprint Goal</label>
+                <textarea
+                  rows={2}
+                  value={editFormData.goal}
+                  onChange={(e) => setEditFormData(prev => ({ ...prev, goal: e.target.value }))}
+                  placeholder="Sprint goal"
+                  className="flex min-h-[40px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                />
+              </div>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-3 p-6 border-t border-border">
+              <Button variant="outline" onClick={closeEditModal}>
+                Cancel
+              </Button>
+              <Button onClick={saveSprintEdits}>
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
