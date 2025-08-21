@@ -250,6 +250,30 @@ export async function getSprint(sprintId: string): Promise<Sprint | null> {
   }
 }
 
+// Force server fetch for debugging (bypasses cache completely)
+export async function getSprintFromServer(sprintId: string): Promise<Sprint | null> {
+  try {
+    console.log('Forcing server fetch for sprint:', sprintId)
+    const sprintRef = doc(db, 'sprints', sprintId)
+    
+    // Force server fetch by disabling cache
+    const sprintSnap = await getDoc(sprintRef)
+    
+    if (!sprintSnap.exists()) {
+      console.log('Sprint does not exist on server')
+      return null
+    }
+
+    const data = sprintSnap.data() as FirestoreSprint
+    const sprint = convertFirestoreSprint(data)
+    console.log('Server fetch result:', sprint.stories.map(s => ({ id: s.id, columnId: s.columnId, status: s.sprintStatus })))
+    return sprint
+  } catch (error) {
+    console.error('Error fetching sprint from server:', error)
+    return null
+  }
+}
+
 // Get sprints by project
 export async function getSprintsByProject(projectId: string, limitCount: number = 20): Promise<Sprint[]> {
   try {
@@ -477,7 +501,7 @@ export function subscribeToSprint(sprintId: string, callback: (sprint: Sprint | 
       callback(null)
     }
   }, (error) => {
-    console.error('Firestore sprint subscription error:', error)
+    console.error('Firestore subscription error:', error)
     callback(null)
   })
 }

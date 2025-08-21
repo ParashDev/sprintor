@@ -127,15 +127,23 @@ export function useSprintCollaboration(
 
   // Set up real-time sprint subscription
   useEffect(() => {
-    if (!isInitialized || !isValid) return
+    if (!isInitialized || !isValid) {
+      return
+    }
 
     setConnectionStatus('connecting')
 
     // Subscribe to sprint updates
     const sprintUnsubscribe = subscribeToSprint(sprintId!, (updatedSprint) => {
       if (updatedSprint) {
-        setSprint(updatedSprint)
-        setParticipants(updatedSprint.participants)
+        console.log('🔄 COLLABORATION HOOK: Setting new sprint state')
+        // Force completely new object references for React to detect changes
+        setSprint({ 
+          ...updatedSprint,
+          stories: [...updatedSprint.stories.map(s => ({ ...s }))],  // Deep copy stories array
+          columns: [...updatedSprint.columns.map(c => ({ ...c }))]   // Deep copy columns array
+        })
+        setParticipants([...updatedSprint.participants])
         setConnectionStatus('connected')
         setError(null)
       } else {

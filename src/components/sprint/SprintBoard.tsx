@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -11,8 +11,7 @@ import {
   TouchSensor,
   MouseSensor,
   type DragEndEvent,
-  type DragStartEvent,
-  type DragOverEvent
+  type DragStartEvent
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -21,7 +20,7 @@ import {
 } from '@dnd-kit/sortable'
 import { restrictToWindowEdges } from '@dnd-kit/modifiers'
 import type { Sprint, SprintStory, SprintParticipant } from '@/types/sprint'
-import { updateSprint } from '@/lib/sprint-service'
+import { updateSprint, subscribeToSprint } from '@/lib/sprint-service'
 import { SprintColumn } from './SprintColumn'
 import { SprintCard } from './SprintCard'
 import { SprintHeader } from './SprintHeader'
@@ -45,108 +44,78 @@ export function SprintBoard({
   onSprintUpdate,
   onLeave
 }: SprintBoardProps) {
+  const [localSprint, setLocalSprint] = useState(sprint)
   const [activeStory, setActiveStory] = useState<SprintStory | null>(null)
   const [showAddStoryModal, setShowAddStoryModal] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [isLocalUpdate, setIsLocalUpdate] = useState(false)
+
+  // Use local sprint state for immediate UI updates
+  const currentSprint = localSprint
+
+  // Set up real-time subscription for updates from other users
+  useEffect(() => {
+    const unsubscribe = subscribeToSprint(sprint.id, (updatedSprint) => {
+      if (updatedSprint && !isLocalUpdate) {
+        // Only update if this isn't our own local update
+        setLocalSprint(updatedSprint)
+      }
+      // Reset the flag
+      setIsLocalUpdate(false)
+    })
+
+    return unsubscribe
+  }, [sprint.id, isLocalUpdate])
+
+  // Update local sprint when prop changes (initial load)
+  useEffect(() => {
+    setLocalSprint(sprint)
+  }, [sprint])
 
   // Configure drag sensors
   const mouseSensor = useSensor(MouseSensor, {
-    activationConstraint: {
-      distance: 10
-    }
+    activationConstraint: { distance: 10 }
   })
-
   const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: {
-      delay: 250,
-      tolerance: 5
-    }
+    activationConstraint: { delay: 250, tolerance: 5 }
   })
-
   const keyboardSensor = useSensor(KeyboardSensor)
-
   const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor)
 
   // Handle drag start
-  const handleDragStart = useCallback((event: DragStartEvent) => {
+  const handleDragStart = (event: DragStartEvent) => {
     if (accessLevel === 'view') return
     
     const { active } = event
-    const activeStoryData = sprint.stories.find(story => story.id === active.id)
+    const activeStoryData = currentSprint.stories.find(story => story.id === active.id)
     
     if (activeStoryData) {
       setActiveStory(activeStoryData)
       setIsDragging(true)
     }
-  }, [sprint.stories, accessLevel])
+  }
 
-  // Handle drag over
-  const handleDragOver = useCallback((event: DragOverEvent) => {
+  // Handle drag end
+  const handleDragEnd = async (event: DragEndEvent) => {
     if (accessLevel === 'view') return
     
     const { active, over } = event
+    setActiveStory(null)
+    setIsDragging(false)
 
     if (!over) return
 
     const activeStoryId = active.id as string
     const overId = over.id as string
 
-    // Find the active story and the target column
-    const activeStory = sprint.stories.find(s => s.id === activeStoryId)
-    if (!activeStory) return
-
-    // Check if we're hovering over a column
-    const isOverColumn = sprint.columns.some(col => col.id === overId)
-    if (isOverColumn && activeStory.columnId !== overId) {
-      // Moving to a different column - update the story
-      const targetColumn = sprint.columns.find(col => col.id === overId)
-      if (targetColumn) {
-        const updatedStories = sprint.stories.map(story => {
-          if (story.id === activeStoryId) {
-            return {
-              ...story,
-              columnId: overId,
-              sprintStatus: targetColumn.status,
-              position: sprint.stories.filter(s => s.columnId === overId).length
-            }
-          }
-          return story
-        })
-
-        // Update locally first for immediate feedback
-        if (onSprintUpdate) {
-          onSprintUpdate({
-            ...sprint,
-            stories: updatedStories
-          })
-        }
-      }
-    }
-  }, [sprint, accessLevel, onSprintUpdate])
-
-  // Handle drag end
-  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
-    if (accessLevel === 'view') return
-    
-    const { active, over } = event
-
-    if (!over) {
-      setActiveStory(null)
-      setIsDragging(false)
-      return
-    }
-
-    const activeStoryId = active.id as string
-    const overId = over.id as string
-
     try {
-      const activeStory = sprint.stories.find(s => s.id === activeStoryId)
+      const activeStory = currentSprint.stories.find(s => s.id === activeStoryId)
       if (!activeStory) return
 
-      let updatedStories = [...sprint.stories]
+      let updatedStories = [...currentSprint.stories]
 
       // Handle dropping on a column
-      const targetColumn = sprint.columns.find(col => col.id === overId)
+      const targetColumn = currentSprint.columns.find(col => col.id === overId)
       if (targetColumn && activeStory.columnId !== overId) {
         // Moving to different column
         updatedStories = updatedStories.map(story => {
@@ -155,7 +124,7 @@ export function SprintBoard({
               ...story,
               columnId: overId,
               sprintStatus: targetColumn.status,
-              position: sprint.stories.filter(s => s.columnId === overId).length,
+              position: currentSprint.stories.filter(s => s.columnId === overId).length,
               lastUpdated: new Date(),
               ...(targetColumn.status === 'in_progress' && !story.startedAt && { startedAt: new Date() }),
               ...(targetColumn.status === 'done' && !story.completedAt && { completedAt: new Date() })
@@ -165,8 +134,8 @@ export function SprintBoard({
         })
       } else {
         // Reordering within same column
-        const activeIndex = sprint.stories.findIndex(s => s.id === activeStoryId)
-        const overIndex = sprint.stories.findIndex(s => s.id === overId)
+        const activeIndex = currentSprint.stories.findIndex(s => s.id === activeStoryId)
+        const overIndex = currentSprint.stories.findIndex(s => s.id === overId)
 
         if (activeIndex !== -1 && overIndex !== -1) {
           updatedStories = arrayMove(updatedStories, activeIndex, overIndex)
@@ -180,8 +149,15 @@ export function SprintBoard({
         }
       }
 
-      // Update the sprint with new story positions
-      await updateSprint(sprint.id, {
+      // Mark this as our local update to prevent subscription override
+      setIsLocalUpdate(true)
+      
+      // Update local state immediately for instant UI feedback
+      const newSprint = { ...currentSprint, stories: updatedStories }
+      setLocalSprint(newSprint)
+
+      // Update database in background
+      await updateSprint(currentSprint.id, {
         storyUpdates: updatedStories.map(story => ({
           id: story.id,
           sprintStatus: story.sprintStatus,
@@ -190,70 +166,39 @@ export function SprintBoard({
         }))
       })
 
-      // Update local state
-      if (onSprintUpdate) {
-        onSprintUpdate({
-          ...sprint,
-          stories: updatedStories
-        })
-      }
-
     } catch (error) {
       console.error('Error updating story position:', error)
-      // Revert local changes on error
-      if (onSprintUpdate) {
-        onSprintUpdate(sprint)
-      }
-    } finally {
-      setActiveStory(null)
-      setIsDragging(false)
+      // Revert local state on error
+      setLocalSprint(sprint)
     }
-  }, [sprint, accessLevel, onSprintUpdate])
+  }
+
+  // Group stories by column
+  const storiesByColumn: Record<string, SprintStory[]> = {}
+  currentSprint.columns.forEach(column => {
+    storiesByColumn[column.id] = currentSprint.stories
+      .filter(story => story.columnId === column.id)
+      .sort((a, b) => a.position - b.position)
+  })
 
   // Calculate column metrics
-  const getColumnMetrics = useCallback((columnId: string) => {
-    const columnStories = sprint.stories.filter(story => story.columnId === columnId)
+  const getColumnMetrics = (columnId: string) => {
+    const columnStories = storiesByColumn[columnId] || []
     const storyPoints = columnStories.reduce((sum, story) => sum + (story.storyPoints || 0), 0)
-    const column = sprint.columns.find(col => col.id === columnId)
+    const column = currentSprint.columns.find(col => col.id === columnId)
     
     return {
       storyCount: columnStories.length,
       storyPoints,
       isOverWipLimit: column?.wipLimit ? columnStories.length > column.wipLimit : false
     }
-  }, [sprint.stories, sprint.columns])
-
-  // Group stories by column
-  const storiesByColumn = React.useMemo(() => {
-    const grouped: Record<string, SprintStory[]> = {}
-    
-    sprint.columns.forEach(column => {
-      grouped[column.id] = sprint.stories
-        .filter(story => story.columnId === column.id)
-        .sort((a, b) => a.position - b.position)
-    })
-    
-    return grouped
-  }, [sprint.stories, sprint.columns])
-
-  // Handle keyboard shortcuts
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (accessLevel === 'admin' && e.key === 'a' && e.ctrlKey) {
-        e.preventDefault()
-        setShowAddStoryModal(true)
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyPress)
-    return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [accessLevel])
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       {/* Sprint Header */}
       <SprintHeader
-        sprint={sprint}
+        sprint={currentSprint}
         accessLevel={accessLevel}
         participants={participants}
         onAddStory={() => setShowAddStoryModal(true)}
@@ -266,13 +211,12 @@ export function SprintBoard({
           sensors={sensors}
           collisionDetection={closestCorners}
           onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
           modifiers={[restrictToWindowEdges]}
         >
           {/* Board Columns */}
           <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4">
-            {sprint.columns.map(column => (
+            {currentSprint.columns.map(column => (
               <div key={column.id} className="flex-shrink-0">
                 <SortableContext
                   items={storiesByColumn[column.id]?.map(story => story.id) || []}
@@ -310,18 +254,10 @@ export function SprintBoard({
       {/* Add Story Modal */}
       {showAddStoryModal && (
         <AddStoryModal
-          sprint={sprint}
+          sprint={currentSprint}
           isOpen={showAddStoryModal}
           onClose={() => setShowAddStoryModal(false)}
-          onStoryAdded={(newStory) => {
-            if (onSprintUpdate) {
-              onSprintUpdate({
-                ...sprint,
-                stories: [...sprint.stories, newStory]
-              })
-            }
-            setShowAddStoryModal(false)
-          }}
+          onStoryAdded={() => setShowAddStoryModal(false)}
         />
       )}
 
@@ -334,22 +270,22 @@ export function SprintBoard({
           <div className="grid grid-cols-2 gap-4 text-xs text-slate-600 dark:text-slate-400">
             <div>
               <div className="font-medium">Stories</div>
-              <div>{sprint.stories.length} total</div>
+              <div>{currentSprint.stories.length} total</div>
             </div>
             <div>
               <div className="font-medium">Points</div>
-              <div>{sprint.totalStoryPoints} committed</div>
+              <div>{currentSprint.totalStoryPoints} committed</div>
             </div>
             <div>
               <div className="font-medium">Done</div>
               <div>
-                {sprint.stories.filter(s => s.sprintStatus === 'done').length} stories
+                {currentSprint.stories.filter(s => s.sprintStatus === 'done').length} stories
               </div>
             </div>
             <div>
               <div className="font-medium">In Progress</div>
               <div>
-                {sprint.stories.filter(s => s.sprintStatus === 'in_progress').length} stories
+                {currentSprint.stories.filter(s => s.sprintStatus === 'in_progress').length} stories
               </div>
             </div>
           </div>

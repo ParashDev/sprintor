@@ -73,15 +73,30 @@ export function SprintPasswordModal({
     setIsLoading(true)
 
     try {
+      console.log('Validating sprint access:', {
+        sprintId: sprint.id,
+        hasPassword: !!password.trim(),
+        participantName: participantName.trim(),
+        allowGuestAccess: sprint.allowGuestAccess
+      })
+      
       const result = await validateSprintAccess(
         sprint.id,
         password.trim() || undefined,
         participantName.trim()
       )
 
+      console.log('Sprint access validation result:', result)
+
       if (result.success && result.accessToken && result.participantId && result.accessLevel) {
         // Store participant name for next time
         localStorage.setItem('sprintor_participant_name', participantName.trim())
+        
+        console.log('Calling onSuccess with:', {
+          accessToken: result.accessToken.substring(0, 10) + '...',
+          participantId: result.participantId,
+          accessLevel: result.accessLevel
+        })
         
         onSuccess({
           accessToken: result.accessToken,
@@ -89,6 +104,7 @@ export function SprintPasswordModal({
           accessLevel: result.accessLevel
         })
       } else {
+        console.log('Sprint access validation failed:', result.error)
         setError(result.error || 'Failed to join sprint')
       }
     } catch (error) {

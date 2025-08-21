@@ -5,9 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { SprintBoard } from '@/components/sprint/SprintBoard'
 import { SprintPasswordModal } from '@/components/sprint/SprintPasswordModal'
-import { useSprintCollaboration } from '@/hooks/useSprintCollaboration'
 import { getSprint } from '@/lib/sprint-service'
-import { parseSprintLink, validateSprintAccess } from '@/lib/sprint-access-service'
+import { validateSprintAccess } from '@/lib/sprint-access-service'
 import type { Sprint } from '@/types/sprint'
 
 export default function SprintPage() {
@@ -22,20 +21,11 @@ export default function SprintPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  // Access credentials (will be set after successful authentication)
+  // Access credentials
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [participantId, setParticipantId] = useState<string | null>(null)
   const [participantName, setParticipantName] = useState<string | null>(null)
-
-  // Real-time collaboration hook (only initialized after authentication)
-  const collaboration = useSprintCollaboration(
-    accessToken && participantId && participantName ? {
-      sprintId,
-      accessToken,
-      participantId,
-      participantName
-    } : null
-  )
+  const [accessLevel, setAccessLevel] = useState<'view' | 'contribute' | 'admin'>('view')
 
   // Load sprint data on page load
   useEffect(() => {
@@ -65,7 +55,7 @@ export default function SprintPage() {
               setAccessToken(hostAccess.accessToken)
               setParticipantId(hostAccess.participantId)
               setParticipantName(user.displayName || user.email || 'Host')
-              // No need to show password modal for host
+              setAccessLevel(hostAccess.accessLevel)
               return
             }
           } catch (error) {
@@ -73,13 +63,8 @@ export default function SprintPage() {
           }
         }
         
-        // Check if we need password authentication
-        if (!sprintData.allowGuestAccess) {
-          setShowPasswordModal(true)
-        } else {
-          // For guest access, we still need to show the modal to get participant name
-          setShowPasswordModal(true)
-        }
+        // Show password modal for authentication
+        setShowPasswordModal(true)
         
       } catch (err) {
         console.error('Error loading sprint:', err)
@@ -94,18 +79,6 @@ export default function SprintPage() {
     }
   }, [sprintId, user])
 
-  // Parse URL parameters for automatic authentication (if password is in URL)
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const linkInfo = parseSprintLink(window.location.href)
-      
-      if (linkInfo.isValid && linkInfo.password) {
-        // Auto-populate password if provided in URL
-        console.log('Password found in URL - this should only be used for testing')
-      }
-    }
-  }, [])
-
   // Handle successful authentication
   const handleAuthSuccess = (authData: {
     accessToken: string
@@ -114,6 +87,7 @@ export default function SprintPage() {
   }) => {
     setAccessToken(authData.accessToken)
     setParticipantId(authData.participantId)
+    setAccessLevel(authData.accessLevel)
     
     // Get participant name from localStorage or use a default
     const storedName = localStorage.getItem('sprintor_participant_name') || 'Anonymous'
@@ -129,13 +103,8 @@ export default function SprintPage() {
     setParticipantId(null)
     setParticipantName(null)
     
-    // Redirect to home or show modal again
+    // Redirect to home
     router.push('/')
-  }
-
-  // Handle sprint updates from real-time collaboration
-  const handleSprintUpdate = (updatedSprint: Sprint) => {
-    setSprint(updatedSprint)
   }
 
   // Loading state
@@ -205,66 +174,13 @@ export default function SprintPage() {
     )
   }
 
-  // Show connection error
-  if (collaboration.connectionStatus === 'error' || !collaboration.isValid) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto px-4">
-          <div className="bg-red-100 dark:bg-red-900/30 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
-            Connection Error
-          </h2>
-          <p className="text-slate-600 dark:text-slate-400 mb-6">
-            {collaboration.error || 'Failed to connect to the sprint. Please check your connection and try again.'}
-          </p>
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              Retry
-            </button>
-            <button
-              onClick={() => router.push('/')}
-              className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-            >
-              Go Home
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Show connecting state
-  if (collaboration.connectionStatus === 'connecting') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
-            Connecting to Sprint...
-          </h2>
-          <p className="text-slate-600 dark:text-slate-400">
-            Setting up real-time collaboration
-          </p>
-        </div>
-      </div>
-    )
-  }
-
   // Render the main sprint board
   return (
     <SprintBoard
-      sprint={collaboration.sprint || sprint}
-      accessLevel={collaboration.accessLevel}
+      sprint={sprint}
+      accessLevel={accessLevel}
       participantId={participantId}
-      participants={collaboration.participants}
-      onSprintUpdate={handleSprintUpdate}
+      participants={[]} // Simple implementation - no real-time participants for now
       onLeave={handleLeaveSprint}
     />
   )
