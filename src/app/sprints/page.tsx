@@ -6,6 +6,9 @@ import { useAuth } from '@/contexts/AuthContext'
 import { getProjectsByOwner } from '@/lib/project-service'
 import { getSprintsByProject } from '@/lib/sprint-service'
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { 
   Plus, 
   Calendar, 
@@ -19,6 +22,9 @@ import {
   Search,
   ExternalLink,
   Copy,
+  TrendingUp,
+  Activity,
+  Timer
 } from 'lucide-react'
 import type { Sprint } from '@/types/sprint'
 import type { Project } from '@/lib/project-service'
@@ -88,6 +94,20 @@ export default function SprintsPage() {
     
     return matchesSearch && matchesStatus
   })
+
+  // Calculate stats for the current project
+  const sprintStats = {
+    totalSprints: filteredSprints.length,
+    activeSprints: filteredSprints.filter(s => s.status === 'active').length,
+    completedSprints: filteredSprints.filter(s => s.status === 'completed').length,
+    totalStoryPoints: filteredSprints.reduce((sum, s) => sum + s.totalStoryPoints, 0),
+    averageVelocity: filteredSprints.length > 0 
+      ? Math.round(filteredSprints.reduce((sum, s) => sum + s.totalStoryPoints, 0) / filteredSprints.length)
+      : 0,
+    completionRate: filteredSprints.length > 0 
+      ? Math.round((filteredSprints.filter(s => s.status === 'completed').length / filteredSprints.length) * 100)
+      : 0
+  }
 
   // Get status color and icon
   const getStatusDisplay = (status: string) => {
@@ -160,122 +180,176 @@ export default function SprintsPage() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <DashboardHeader />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
-              Sprint Boards
-            </h1>
-            <p className="text-slate-600 dark:text-slate-400 mt-2">
-              Create and manage collaborative sprint planning sessions
-            </p>
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold">Sprint Boards</h1>
+              <p className="text-muted-foreground mt-1">Create and manage collaborative sprint planning sessions</p>
+            </div>
+            <Button 
+              size="lg" 
+              onClick={() => router.push(`/sprints/create?project=${selectedProject}`)}
+              disabled={!selectedProject}
+            >
+              <Plus className="mr-2 h-5 w-5" />
+              Create Sprint
+            </Button>
           </div>
           
-          <button
-            onClick={() => router.push(`/sprints/create?project=${selectedProject}`)}
-            disabled={!selectedProject}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 disabled:bg-slate-400 disabled:cursor-not-allowed text-white dark:text-slate-900 rounded-lg transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            Create Sprint
-          </button>
-        </div>
-
-        {/* Filters */}
-        <div className="mb-6 space-y-4">
           {/* Project Selection */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Project
-              </label>
-              <select
-                value={selectedProject}
-                onChange={(e) => setSelectedProject(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">Select a project</option>
-                {projects.map(project => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            {/* Search */}
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Search Sprints
-              </label>
-              <div className="relative">
-                <Search className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search by name or description..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
+              <label className="text-sm font-medium whitespace-nowrap">Project:</label>
+              <div className="w-full sm:min-w-[200px]">
+                <select
+                  value={selectedProject}
+                  onChange={(e) => setSelectedProject(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="">Select a project</option>
+                  {projects.map(project => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
               </div>
-            </div>
-
-            {/* Status Filter */}
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Status
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Status</option>
-                <option value="draft">Draft</option>
-                <option value="active">Active</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
             </div>
           </div>
         </div>
+
+        {/* Stats Cards */}
+        {selectedProject && (
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-4 mb-8">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Sprints</CardTitle>
+                <Activity className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{sprintStats.totalSprints}</div>
+                <p className="text-xs text-muted-foreground">
+                  {sprintStats.totalSprints === 0 ? "No sprints yet" : "Active project sprints"}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{sprintStats.activeSprints}</div>
+                <p className="text-xs text-muted-foreground">
+                  {sprintStats.activeSprints === 0 ? "None in progress" : "Currently running"}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Avg Velocity</CardTitle>
+                <Timer className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{sprintStats.averageVelocity}</div>
+                <p className="text-xs text-muted-foreground">
+                  {sprintStats.totalSprints === 0 ? "No data yet" : "Story points per sprint"}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
+                <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{sprintStats.completionRate}%</div>
+                <p className="text-xs text-muted-foreground">
+                  {sprintStats.completedSprints === 0 ? "Complete first sprint" : "Sprint completion rate"}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Filters - After Stats Cards */}
+        {selectedProject && (
+          <div className="mb-6 space-y-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              {/* Search */}
+              <div className="flex-1">
+                <label className="block text-sm font-medium mb-2">
+                  Search Sprints
+                </label>
+                <div className="relative">
+                  <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 transform -translate-y-1/2" />
+                  <Input
+                    type="text"
+                    placeholder="Search by name or description..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex-1">
+                <label className="block text-sm font-medium mb-2">
+                  Status
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <option value="all">All Status</option>
+                  <option value="draft">Draft</option>
+                  <option value="active">Active</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         {/* Sprint List */}
         {!selectedProject ? (
           <div className="text-center py-12">
-            <Target className="w-16 h-16 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
+            <Target className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">
               Select a Project
             </h3>
-            <p className="text-slate-600 dark:text-slate-400">
+            <p className="text-muted-foreground">
               Choose a project to view and manage its sprint boards
             </p>
           </div>
         ) : isLoading ? (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900 dark:border-slate-100 mx-auto mb-4"></div>
-            <p className="text-slate-600 dark:text-slate-400">Loading sprints...</p>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading sprints...</p>
           </div>
         ) : filteredSprints.length === 0 ? (
           <div className="text-center py-12">
-            <BarChart3 className="w-16 h-16 text-slate-400 dark:text-slate-500 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
+            <BarChart3 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">
               {sprints.length === 0 ? 'No Sprints Yet' : 'No Matching Sprints'}
             </h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-6">
+            <p className="text-muted-foreground mb-6">
               {sprints.length === 0 
                 ? 'Create your first sprint board to start collaborative planning'
                 : 'Try adjusting your search or filter criteria'
               }
             </p>
             {sprints.length === 0 && (
-              <button
+              <Button 
                 onClick={() => router.push(`/sprints/create?project=${selectedProject}`)}
-                className="px-6 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 text-white dark:text-slate-900 rounded-lg transition-colors"
               >
                 Create Your First Sprint
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -290,24 +364,18 @@ export default function SprintsPage() {
               const daysRemaining = getDaysRemaining(sprint.endDate)
 
               return (
-                <div
-                  key={sprint.id}
-                  className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition-shadow"
-                >
-                  {/* Card Header */}
-                  <div className="p-6">
-                    <div className="flex items-start justify-between mb-4">
+                <Card key={sprint.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-1">
-                          {sprint.name}
-                        </h3>
+                        <CardTitle className="text-lg mb-2">{sprint.name}</CardTitle>
                         <div className="flex items-center gap-2">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 ${statusDisplay.color}`}>
                             <StatusIcon className="w-3 h-3" />
                             {sprint.status.charAt(0).toUpperCase() + sprint.status.slice(1)}
                           </span>
                           {daysRemaining > 0 && sprint.status === 'active' && (
-                            <span className="text-xs text-slate-500 dark:text-slate-400">
+                            <span className="text-xs text-muted-foreground">
                               {daysRemaining} days left
                             </span>
                           )}
@@ -315,26 +383,30 @@ export default function SprintsPage() {
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        <button
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => copySprintLink(sprint.id)}
-                          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                           title="Copy sprint link"
                         >
-                          <Copy className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                        </button>
-                        <button
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => router.push(`/sprint/${sprint.id}`)}
-                          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                           title="Open sprint"
                         >
-                          <ExternalLink className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                        </button>
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
-
+                  </CardHeader>
+                  
+                  <CardContent>
                     {/* Description */}
                     {sprint.description && (
-                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 line-clamp-2">
+                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
                         {sprint.description}
                       </p>
                     )}
@@ -359,45 +431,43 @@ export default function SprintsPage() {
                     {/* Progress Bar */}
                     <div className="mb-4">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-slate-600 dark:text-slate-400">Progress</span>
-                        <span className="text-sm text-slate-600 dark:text-slate-400">
+                        <span className="text-sm text-muted-foreground">Progress</span>
+                        <span className="text-sm text-muted-foreground">
                           {completedStories}/{sprint.stories.length} stories
                         </span>
                       </div>
-                      <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                      <div className="w-full bg-secondary rounded-full h-2">
                         <div
-                          className="bg-green-500 dark:bg-green-400 h-2 rounded-full transition-all duration-300"
+                          className="bg-primary h-2 rounded-full transition-all duration-300"
                           style={{ width: `${progressPercentage}%` }}
                         />
                       </div>
                     </div>
 
                     {/* Stats */}
-                    <div className="grid grid-cols-3 gap-4 text-center">
+                    <div className="grid grid-cols-3 gap-4 text-center mb-4">
                       <div>
-                        <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                        <div className="text-lg font-semibold">
                           {sprint.stories.length}
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">Stories</div>
+                        <div className="text-xs text-muted-foreground">Stories</div>
                       </div>
                       <div>
-                        <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                        <div className="text-lg font-semibold">
                           {sprint.totalStoryPoints}
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">Points</div>
+                        <div className="text-xs text-muted-foreground">Points</div>
                       </div>
                       <div>
-                        <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                        <div className="text-lg font-semibold">
                           {sprint.duration}
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">Days</div>
+                        <div className="text-xs text-muted-foreground">Days</div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Card Footer */}
-                  <div className="px-6 py-4 bg-slate-50 dark:bg-slate-750 border-t border-slate-200 dark:border-slate-700">
-                    <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
+                    {/* Date and Participants */}
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Calendar className="w-4 h-4" />
                         <span>{formatDate(sprint.startDate)} - {formatDate(sprint.endDate)}</span>
@@ -409,13 +479,13 @@ export default function SprintsPage() {
                         </div>
                       )}
                     </div>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               )
             })}
           </div>
         )}
-      </div>
+      </main>
     </div>
   )
 }
