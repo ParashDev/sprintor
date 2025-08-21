@@ -38,14 +38,15 @@ export function SprintColumn({
     <div
       ref={setNodeRef}
       className={`
-        w-80 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700
-        ${isOver ? 'ring-2 ring-blue-500 ring-opacity-50 bg-blue-50 dark:bg-blue-900/20' : ''}
-        ${isDraggedOver ? 'bg-slate-50 dark:bg-slate-750' : ''}
-        transition-all duration-200
+        w-72 sm:w-80 h-full bg-white dark:bg-slate-800 rounded-xl shadow-sm transition-all duration-200 flex flex-col
+        ${isDraggedOver 
+          ? 'border-2 border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-900/20' 
+          : 'border border-slate-200 dark:border-slate-700'
+        }
       `}
     >
       {/* Column Header */}
-      <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+      <div className="p-3 sm:p-4 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* Column Color Indicator */}
@@ -55,20 +56,13 @@ export function SprintColumn({
             />
             
             {/* Column Title */}
-            <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">
+            <h3 className="text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
               {column.name}
             </h3>
             
             {/* Story Count Badge */}
-            <div className={`
-              px-2 py-0.5 rounded-full text-xs font-medium
-              ${metrics.isOverWipLimit 
-                ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300' 
-                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
-              }
-            `}>
+            <div className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
               {metrics.storyCount}
-              {column.wipLimit && ` / ${column.wipLimit}`}
             </div>
           </div>
 
@@ -89,24 +83,22 @@ export function SprintColumn({
           <div className="flex items-center gap-1">
             <span>{metrics.storyPoints} points</span>
           </div>
-          
-          {metrics.isOverWipLimit && (
-            <div className="flex items-center gap-1 text-red-600 dark:text-red-400">
-              <AlertTriangle className="w-3 h-3" />
-              <span>Over WIP limit</span>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Story Cards */}
-      <div className={`
-        p-3 min-h-[200px] max-h-[calc(100vh-300px)] overflow-y-auto
-        ${isOver ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}
-        transition-colors duration-200
-      `}>
-        <SortableContext items={stories.map(s => s.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-3">
+      {/* Story Cards Area */}
+      <div className="relative flex-1 overflow-y-auto">
+        {/* Visual Drop Indicator when hovering */}
+        {isDraggedOver && (
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
+            <div className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg">
+              Drop story here
+            </div>
+          </div>
+        )}
+
+        <div className="p-2 sm:p-3 space-y-2 sm:space-y-3 h-full">
+          <SortableContext items={stories.map(s => s.id)} strategy={verticalListSortingStrategy}>
             {stories.map(story => (
               <SprintCard
                 key={story.id}
@@ -115,40 +107,33 @@ export function SprintColumn({
                 isDragging={false}
               />
             ))}
-            
-            {/* Empty State */}
-            {stories.length === 0 && (
-              <div className="text-center py-8 text-slate-400 dark:text-slate-500">
-                <div className="text-sm">No stories in {column.name.toLowerCase()}</div>
+          </SortableContext>
+          
+          {/* Empty State Only */}
+          {stories.length === 0 && (
+            <div className="flex items-center justify-center h-full text-center py-16 text-slate-400 dark:text-slate-500">
+              <div>
+                <div className="text-sm mb-2">No stories in {column.name.toLowerCase()}</div>
+                <div className="text-xs text-slate-300 dark:text-slate-600 mb-3">Drag stories here</div>
                 {canAddStories && (
                   <button
                     onClick={onAddStory}
-                    className="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                   >
                     Add your first story
                   </button>
                 )}
               </div>
-            )}
-          </div>
-        </SortableContext>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Column Footer (if needed for additional info) */}
-      {(column.wipLimit || column.status === 'done') && (
-        <div className="px-4 py-2 bg-slate-50 dark:bg-slate-750 rounded-b-xl border-t border-slate-200 dark:border-slate-700">
-          <div className="flex justify-between items-center text-xs text-slate-500 dark:text-slate-400">
-            {column.wipLimit && (
-              <div>
-                WIP Limit: {column.wipLimit}
-              </div>
-            )}
-            
-            {column.status === 'done' && metrics.storyCount > 0 && (
-              <div className="text-green-600 dark:text-green-400">
-                ✓ {metrics.storyCount} completed
-              </div>
-            )}
+      {/* Column Footer - Only show completion for done column */}
+      {column.status === 'done' && metrics.storyCount > 0 && (
+        <div className="px-3 sm:px-4 py-2 bg-slate-50 dark:bg-slate-750 rounded-b-xl border-t border-slate-200 dark:border-slate-700">
+          <div className="flex justify-center items-center text-xs text-green-600 dark:text-green-400">
+            ✓ {metrics.storyCount} completed
           </div>
         </div>
       )}

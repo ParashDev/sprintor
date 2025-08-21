@@ -27,11 +27,11 @@ function CreateSprintForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   
-  // Form refs for uncontrolled inputs (performance optimization)
-  const formRefs = useRef({
-    name: null as HTMLInputElement | null,
-    description: null as HTMLTextAreaElement | null,
-    goal: null as HTMLTextAreaElement | null
+  // Form state - use controlled inputs instead of refs
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    goal: ''
   })
 
   // State
@@ -141,10 +141,10 @@ function CreateSprintForm() {
 
     if (step === 1) {
       // Basic Info
-      if (!formRefs.current.name?.value?.trim()) {
+      if (!formData.name.trim()) {
         newErrors.name = 'Sprint name is required'
       }
-      if (!formRefs.current.goal?.value?.trim()) {
+      if (!formData.goal.trim()) {
         newErrors.goal = 'Sprint goal is required'
       }
       if (!selectedProject) {
@@ -212,9 +212,9 @@ function CreateSprintForm() {
       console.log('Final password being sent:', finalPassword)
       
       const sprintData: CreateSprintRequest = {
-        name: formRefs.current.name?.value || '',
-        description: formRefs.current.description?.value || '',
-        goal: formRefs.current.goal?.value || '',
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        goal: formData.goal.trim(),
         projectId: selectedProject,
         epicId: selectedEpic || undefined,
         startDate: new Date(startDate),
@@ -348,8 +348,9 @@ function CreateSprintForm() {
                         Sprint Name *
                       </label>
                       <input
-                        ref={el => { if (formRefs.current) formRefs.current.name = el }}
                         type="text"
+                        value={formData.name}
+                        onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                         placeholder="e.g., Sprint 1: User Authentication"
                         className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-slate-500 focus:border-transparent"
                       />
@@ -362,8 +363,9 @@ function CreateSprintForm() {
                         Description
                       </label>
                       <textarea
-                        ref={el => { if (formRefs.current) formRefs.current.description = el }}
                         rows={3}
+                        value={formData.description}
+                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                         placeholder="Brief description of what this sprint will accomplish..."
                         className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-slate-500 focus:border-transparent"
                       />
@@ -375,8 +377,9 @@ function CreateSprintForm() {
                         Sprint Goal *
                       </label>
                       <textarea
-                        ref={el => { if (formRefs.current) formRefs.current.goal = el }}
                         rows={2}
+                        value={formData.goal}
+                        onChange={(e) => setFormData(prev => ({ ...prev, goal: e.target.value }))}
                         placeholder="What is the main objective of this sprint?"
                         className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-slate-500 focus:border-transparent"
                       />

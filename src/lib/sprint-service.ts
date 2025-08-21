@@ -210,6 +210,12 @@ export async function createSprint(sprintData: CreateSprintRequest): Promise<str
       requireEstimation: true
     }
     
+    console.log('Sprint before clean:', {
+      name: sprint.name,
+      description: sprint.description,
+      goal: sprint.goal
+    })
+
     const cleanData = cleanSprintDataForFirestore({
       ...sprint,
       createdAt: serverTimestamp(),
@@ -221,6 +227,12 @@ export async function createSprint(sprintData: CreateSprintRequest): Promise<str
         addedToSprintAt: Timestamp.fromDate(story.addedToSprintAt),
         lastUpdated: Timestamp.fromDate(story.lastUpdated)
       }))
+    })
+
+    console.log('Sprint after clean:', {
+      name: cleanData.name,
+      description: cleanData.description,
+      goal: cleanData.goal
     })
     
     await setDoc(doc(db, 'sprints', sprintId), cleanData)
@@ -549,14 +561,18 @@ export async function addStoryToSprint(sprintId: string, storyId: string): Promi
     if (!projectStory) throw new Error('Story not found or not ready for sprint')
     
     // Convert to sprint story
+    // Find the "todo" column ID
+    const todoColumn = sprint.columns.find(col => col.status === 'todo')
+    const todoColumnId = todoColumn?.id || sprint.columns[0]?.id || 'todo'
+    
     const sprintStory: SprintStory = {
       id: `${sprintId}_${storyId}`,
       originalStoryId: storyId,
       title: projectStory.title,
       description: projectStory.description,
       sprintStatus: 'todo',
-      columnId: 'todo',
-      position: sprint.stories.filter(s => s.columnId === 'todo').length,
+      columnId: todoColumnId,
+      position: sprint.stories.filter(s => s.columnId === todoColumnId).length,
       storyPoints: projectStory.storyPoints,
       progress: 0,
       blockers: [],
@@ -576,17 +592,31 @@ export async function addStoryToSprint(sprintId: string, storyId: string): Promi
     const updatedBacklogIds = [...sprint.backlogStoryIds, storyId]
     const updatedTotalPoints = sprint.totalStoryPoints + (sprintStory.storyPoints || 0)
     
-    await updateSprint(sprintId, {
-      storyUpdates: updatedStories.map(story => ({
-        id: story.id,
-        sprintStatus: story.sprintStatus,
-        position: story.position,
-        columnId: story.columnId
+    // Convert stories for Firestore
+    const firestoreStories = updatedStories.map(story => ({
+      ...story,
+      addedToSprintAt: Timestamp.fromDate(story.addedToSprintAt),
+      startedAt: story.startedAt ? Timestamp.fromDate(story.startedAt) : null,
+      completedAt: story.completedAt ? Timestamp.fromDate(story.completedAt) : null,
+      lastUpdated: Timestamp.fromDate(story.lastUpdated),
+      sprintComments: story.sprintComments.map(comment => ({
+        ...comment,
+        createdAt: Timestamp.fromDate(comment.createdAt)
+      })),
+      statusHistory: story.statusHistory.map(change => ({
+        ...change,
+        timestamp: Timestamp.fromDate(change.timestamp)
+      })),
+      blockers: story.blockers.map(blocker => ({
+        ...blocker,
+        createdAt: Timestamp.fromDate(blocker.createdAt),
+        resolvedAt: blocker.resolvedAt ? Timestamp.fromDate(blocker.resolvedAt) : null
       }))
-    })
+    }))
     
-    // Update other fields separately
+    // Update sprint document directly
     await updateDoc(doc(db, 'sprints', sprintId), {
+      stories: firestoreStories,
       backlogStoryIds: updatedBacklogIds,
       totalStoryPoints: updatedTotalPoints,
       lastActivity: serverTimestamp(),

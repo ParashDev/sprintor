@@ -39,6 +39,13 @@ export default function SprintPage() {
           return
         }
 
+        console.log('Sprint data loaded:', {
+          id: sprintData.id,
+          name: sprintData.name,
+          description: sprintData.description,
+          goal: sprintData.goal
+        })
+
         setSprint(sprintData)
         
         // Check if current user is the host (auto-authenticate as admin)

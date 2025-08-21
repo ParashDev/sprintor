@@ -107,14 +107,18 @@ export function AddStoryModal({ sprint, isOpen, onClose, onStoryAdded }: AddStor
         // Create the sprint story object for immediate UI update
         const projectStory = availableStories.find(s => s.id === storyId)
         if (projectStory) {
+          // Always add new stories to the "To Do" column
+          const todoColumn = sprint.columns.find(col => col.status === 'todo')
+          const todoColumnId = todoColumn?.id || sprint.columns[0]?.id || 'todo'
+          
           const sprintStory: SprintStory = {
             id: `${sprint.id}_${storyId}`,
             originalStoryId: storyId,
             title: projectStory.title,
             description: projectStory.description,
             sprintStatus: 'todo',
-            columnId: 'todo',
-            position: sprint.stories.filter(s => s.columnId === 'todo').length,
+            columnId: todoColumnId,
+            position: sprint.stories.filter(s => s.columnId === todoColumnId).length,
             storyPoints: projectStory.storyPoints,
             progress: 0,
             blockers: [],

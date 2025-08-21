@@ -89,9 +89,10 @@ export function SprintCard({
         group relative bg-white dark:bg-slate-800 rounded-lg border-l-4 shadow-sm
         ${getPriorityColor(story.originalData.priority)}
         ${isDragging || sortableIsDragging ? 'rotate-3 scale-105 shadow-lg z-50' : 'hover:shadow-md'}
-        ${isOverlay ? 'cursor-grabbing' : accessLevel !== 'view' ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
+        ${isOverlay ? 'cursor-grabbing' : accessLevel !== 'view' ? 'cursor-grab active:cursor-grabbing touch-manipulation' : 'cursor-pointer'}
         transition-all duration-200
         ${isCompleted ? 'opacity-75' : ''}
+        ${accessLevel !== 'view' ? 'select-none' : ''}
       `}
     >
       {/* Card Header */}

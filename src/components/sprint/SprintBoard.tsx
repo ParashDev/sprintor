@@ -11,7 +11,8 @@ import {
   TouchSensor,
   MouseSensor,
   type DragEndEvent,
-  type DragStartEvent
+  type DragStartEvent,
+  type DragOverEvent
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -49,6 +50,7 @@ export function SprintBoard({
   const [showAddStoryModal, setShowAddStoryModal] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [isLocalUpdate, setIsLocalUpdate] = useState(false)
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
 
   // Use local sprint state for immediate UI updates
   const currentSprint = localSprint
@@ -56,16 +58,13 @@ export function SprintBoard({
   // Set up real-time subscription for updates from other users
   useEffect(() => {
     const unsubscribe = subscribeToSprint(sprint.id, (updatedSprint) => {
-      if (updatedSprint && !isLocalUpdate) {
-        // Only update if this isn't our own local update
+      if (updatedSprint) {
         setLocalSprint(updatedSprint)
       }
-      // Reset the flag
-      setIsLocalUpdate(false)
     })
 
     return unsubscribe
-  }, [sprint.id, isLocalUpdate])
+  }, [sprint.id])
 
   // Update local sprint when prop changes (initial load)
   useEffect(() => {
@@ -77,7 +76,10 @@ export function SprintBoard({
     activationConstraint: { distance: 10 }
   })
   const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: { delay: 250, tolerance: 5 }
+    activationConstraint: { 
+      delay: 200,      // Slightly faster activation
+      tolerance: 8     // More tolerance for finger movement
+    }
   })
   const keyboardSensor = useSensor(KeyboardSensor)
   const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor)
@@ -95,6 +97,35 @@ export function SprintBoard({
     }
   }
 
+  // Handle drag over to track which column is being hovered
+  const handleDragOver = (event: DragOverEvent) => {
+    if (accessLevel === 'view') return
+
+    const { over } = event
+    if (!over) {
+      setDragOverColumn(null)
+      return
+    }
+
+    const overId = over.id as string
+    
+    // Check if we're over a column directly
+    const targetColumn = currentSprint.columns.find(col => col.id === overId)
+    if (targetColumn) {
+      setDragOverColumn(overId)
+      return
+    }
+
+    // Check if we're over a story - find which column it belongs to
+    const overStory = currentSprint.stories.find(s => s.id === overId)
+    if (overStory) {
+      setDragOverColumn(overStory.columnId)
+      return
+    }
+
+    setDragOverColumn(null)
+  }
+
   // Handle drag end
   const handleDragEnd = async (event: DragEndEvent) => {
     if (accessLevel === 'view') return
@@ -102,6 +133,7 @@ export function SprintBoard({
     const { active, over } = event
     setActiveStory(null)
     setIsDragging(false)
+    setDragOverColumn(null)
 
     if (!over) return
 
@@ -114,17 +146,19 @@ export function SprintBoard({
 
       let updatedStories = [...currentSprint.stories]
 
-      // Handle dropping on a column
+      // Handle dropping on a column (check if overId is a column ID)
       const targetColumn = currentSprint.columns.find(col => col.id === overId)
       if (targetColumn && activeStory.columnId !== overId) {
-        // Moving to different column
+        // Moving to different column - add to end of target column
+        const targetColumnStories = currentSprint.stories.filter(s => s.columnId === overId)
+        
         updatedStories = updatedStories.map(story => {
           if (story.id === activeStoryId) {
             return {
               ...story,
               columnId: overId,
               sprintStatus: targetColumn.status,
-              position: currentSprint.stories.filter(s => s.columnId === overId).length,
+              position: targetColumnStories.length, // Add to end
               lastUpdated: new Date(),
               ...(targetColumn.status === 'in_progress' && !story.startedAt && { startedAt: new Date() }),
               ...(targetColumn.status === 'done' && !story.completedAt && { completedAt: new Date() })
@@ -133,19 +167,43 @@ export function SprintBoard({
           return story
         })
       } else {
-        // Reordering within same column
-        const activeIndex = currentSprint.stories.findIndex(s => s.id === activeStoryId)
-        const overIndex = currentSprint.stories.findIndex(s => s.id === overId)
+        // Handle dropping on another story (reordering within column or between columns)
+        const overStory = currentSprint.stories.find(s => s.id === overId)
+        if (overStory) {
+          if (activeStory.columnId === overStory.columnId) {
+            // Reordering within same column
+            const activeIndex = currentSprint.stories.findIndex(s => s.id === activeStoryId)
+            const overIndex = currentSprint.stories.findIndex(s => s.id === overId)
 
-        if (activeIndex !== -1 && overIndex !== -1) {
-          updatedStories = arrayMove(updatedStories, activeIndex, overIndex)
-          
-          // Update positions
-          updatedStories.forEach((story, index) => {
-            if (story.columnId === activeStory.columnId) {
-              story.position = index
+            if (activeIndex !== -1 && overIndex !== -1) {
+              updatedStories = arrayMove(updatedStories, activeIndex, overIndex)
+              
+              // Update positions for stories in this column
+              const columnStories = updatedStories.filter(s => s.columnId === activeStory.columnId)
+              columnStories.forEach((story, index) => {
+                story.position = index
+              })
             }
-          })
+          } else {
+            // Moving to different column - insert at the position of the over story
+            const overStoryColumn = currentSprint.columns.find(col => col.id === overStory.columnId)
+            if (overStoryColumn) {
+              updatedStories = updatedStories.map(story => {
+                if (story.id === activeStoryId) {
+                  return {
+                    ...story,
+                    columnId: overStory.columnId,
+                    sprintStatus: overStoryColumn.status,
+                    position: overStory.position,
+                    lastUpdated: new Date(),
+                    ...(overStoryColumn.status === 'in_progress' && !story.startedAt && { startedAt: new Date() }),
+                    ...(overStoryColumn.status === 'done' && !story.completedAt && { completedAt: new Date() })
+                  }
+                }
+                return story
+              })
+            }
+          }
         }
       }
 
@@ -190,12 +248,12 @@ export function SprintBoard({
     return {
       storyCount: columnStories.length,
       storyPoints,
-      isOverWipLimit: column?.wipLimit ? columnStories.length > column.wipLimit : false
+      isOverWipLimit: false
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+    <div className="h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
       {/* Sprint Header */}
       <SprintHeader
         sprint={currentSprint}
@@ -206,16 +264,17 @@ export function SprintBoard({
       />
 
       {/* Sprint Board */}
-      <div className="flex-1 p-4 md:p-6">
+      <div className="flex-1 p-2 sm:p-4 md:p-6 overflow-hidden min-h-0">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
           modifiers={[restrictToWindowEdges]}
         >
           {/* Board Columns */}
-          <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4">
+          <div className="flex gap-3 sm:gap-4 md:gap-6 overflow-x-auto h-full pb-4">
             {currentSprint.columns.map(column => (
               <div key={column.id} className="flex-shrink-0">
                 <SortableContext
@@ -227,7 +286,7 @@ export function SprintBoard({
                     stories={storiesByColumn[column.id] || []}
                     metrics={getColumnMetrics(column.id)}
                     accessLevel={accessLevel}
-                    isDraggedOver={false}
+                    isDraggedOver={dragOverColumn === column.id}
                   />
                 </SortableContext>
               </div>
@@ -257,7 +316,23 @@ export function SprintBoard({
           sprint={currentSprint}
           isOpen={showAddStoryModal}
           onClose={() => setShowAddStoryModal(false)}
-          onStoryAdded={() => setShowAddStoryModal(false)}
+          onStoryAdded={(newStory) => {
+            // Update local sprint state with the new story (check for duplicates)
+            setLocalSprint(prev => {
+              // Check if story already exists to prevent duplicates
+              const existingStory = prev.stories.find(s => s.id === newStory.id)
+              if (existingStory) {
+                return prev
+              }
+              
+              return {
+                ...prev,
+                stories: [...prev.stories, newStory]
+              }
+            })
+            
+            setShowAddStoryModal(false)
+          }}
         />
       )}
 
