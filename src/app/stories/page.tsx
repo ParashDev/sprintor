@@ -693,7 +693,7 @@ function StoriesContent() {
       
       // Clear completedAt timestamp when moving out of completed status
       if (originalStatus === 'completed' && newStatus !== 'completed') {
-        updateData.completedAt = null
+        updateData.completedAt = undefined
       }
       
       await updateStory(storyId, updateData)
