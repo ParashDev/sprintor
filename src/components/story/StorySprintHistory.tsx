@@ -32,7 +32,7 @@ export function StorySprintHistory({ sprintAttempts }: StorySprintHistoryProps) 
     
     // Handle Firestore Timestamp objects
     let dateObj: Date
-    if (date.toDate && typeof date.toDate === 'function') {
+    if (typeof date === 'object' && date !== null && 'toDate' in date && typeof date.toDate === 'function') {
       dateObj = date.toDate()
     } else if (date instanceof Date) {
       dateObj = date
