@@ -15,7 +15,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import {Settings, LogOut, Loader2, Moon, Sun, Menu, X, ChevronDown, ChevronUp } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import { toast } from "sonner"
 import { useTheme } from "next-themes"
 import { 
@@ -27,10 +27,15 @@ import {
 export function DashboardHeader() {
   const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
+  const pathname = usePathname()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [userAccordionOpen, setUserAccordionOpen] = useState(false)
+
+  const isActiveLink = (href: string) => {
+    return pathname === href
+  }
 
   useEffect(() => {
     setMounted(true)
@@ -68,37 +73,61 @@ export function DashboardHeader() {
             <nav className="hidden md:flex items-center gap-4">
               <Link 
                 href="/dashboard" 
-                className="text-sm font-medium px-3 py-1.5 rounded-md border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground transition-colors"
+                className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
+                  isActiveLink('/dashboard') 
+                    ? 'border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground' 
+                    : 'text-muted-foreground hover:text-primary'
+                }`}
               >
                 Dashboard
               </Link>
               <Link 
                 href="/projects" 
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
+                  isActiveLink('/projects') 
+                    ? 'border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground' 
+                    : 'text-muted-foreground hover:text-primary'
+                }`}
               >
                 Projects
               </Link>
               <Link 
                 href="/epics" 
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
+                  isActiveLink('/epics') 
+                    ? 'border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground' 
+                    : 'text-muted-foreground hover:text-primary'
+                }`}
               >
                 Epics
               </Link>
               <Link 
                 href="/stories" 
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
+                  isActiveLink('/stories') 
+                    ? 'border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground' 
+                    : 'text-muted-foreground hover:text-primary'
+                }`}
               >
                 Stories
               </Link>
               <Link 
                 href="/planning" 
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
+                  isActiveLink('/planning') 
+                    ? 'border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground' 
+                    : 'text-muted-foreground hover:text-primary'
+                }`}
               >
                 Planning
               </Link>
               <Link 
                 href="/sprints" 
-                className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+                className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
+                  isActiveLink('/sprints') 
+                    ? 'border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground' 
+                    : 'text-muted-foreground hover:text-primary'
+                }`}
               >
                 Sprints
               </Link>
@@ -199,42 +228,66 @@ export function DashboardHeader() {
                 <nav className="space-y-2">
                   <Link
                     href="/dashboard"
-                    className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground transition-colors"
+                    className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      isActiveLink('/dashboard')
+                        ? 'border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                    }`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Dashboard
                   </Link>
                   <Link
                     href="/projects"
-                    className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-colors"
+                    className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      isActiveLink('/projects')
+                        ? 'border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                    }`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Projects
                   </Link>
                   <Link
                     href="/epics"
-                    className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-colors"
+                    className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      isActiveLink('/epics')
+                        ? 'border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                    }`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Epics
                   </Link>
                   <Link
                     href="/stories"
-                    className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-colors"
+                    className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      isActiveLink('/stories')
+                        ? 'border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                    }`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Stories
                   </Link>
                   <Link
                     href="/planning"
-                    className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-colors"
+                    className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      isActiveLink('/planning')
+                        ? 'border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                    }`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Planning
                   </Link>
                   <Link
                     href="/sprints"
-                    className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent/50 rounded-md transition-colors"
+                    className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      isActiveLink('/sprints')
+                        ? 'border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                    }`}
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Sprints

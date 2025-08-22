@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { getProjectsByOwner } from "@/lib/project-service"
 import { getEpicsByProject } from "@/lib/epic-service"
 import { getStoriesByProject, getProjectStoryStats } from "@/lib/story-service"
+import { getSprintsByProject } from "@/lib/sprint-service"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -108,6 +109,8 @@ interface DashboardProject {
   storiesCount: number
   storiesInPlanning: number
   storiesSprintReady: number
+  storiesCompleted: number
+  activeSprints: number
   completionRate: number
   lastActivity: Date
 }
@@ -131,6 +134,9 @@ interface ProjectStats {
   totalStories: number
   storiesInPlanning: number
   storiesSprintReady: number
+  storiesCompleted: number
+  activeSprints: number
+  completionRate: number
   overallVelocity: number
   sprintReadiness: number
 }
@@ -159,6 +165,9 @@ export default function DashboardPage() {
     totalStories: 0,
     storiesInPlanning: 0,
     storiesSprintReady: 0,
+    storiesCompleted: 0,
+    activeSprints: 0,
+    completionRate: 0,
     overallVelocity: 0,
     sprintReadiness: 0
   })
@@ -193,6 +202,8 @@ export default function DashboardPage() {
       let totalStories = 0
       let totalStoriesInPlanning = 0
       let totalStoriesSprintReady = 0
+      let totalStoriesCompleted = 0
+      let totalActiveSprints = 0
 
       for (const project of userProjects) {
         // Get epics for this project
@@ -226,9 +237,14 @@ export default function DashboardPage() {
         const storyStats = await getProjectStoryStats(project.id)
         const storiesInPlanning = storyStats.storiesByStatus?.planning || 0
         const storiesSprintReady = storyStats.storiesByStatus?.sprint_ready || 0
+        const storiesCompleted = storyStats.storiesByStatus?.completed || 0
         
-        // Get recent stories for this project (last 10, we'll trim later)
-        const projectStories = await getStoriesByProject(project.id, { limitCount: 10 })
+        // Get sprint data for this project
+        const projectSprints = await getSprintsByProject(project.id, 10)
+        const activeSprints = projectSprints.filter(sprint => sprint.status === 'active').length
+        
+        // Get recent stories for this project (last 20, we'll trim later)
+        const projectStories = await getStoriesByProject(project.id, { limitCount: 20 })
         const recentProjectStories = projectStories.map(story => ({
           id: story.id,
           title: story.title,
@@ -244,6 +260,8 @@ export default function DashboardPage() {
         totalStories += storyStats.totalStories
         totalStoriesInPlanning += storiesInPlanning
         totalStoriesSprintReady += storiesSprintReady
+        totalStoriesCompleted += storiesCompleted
+        totalActiveSprints += activeSprints
 
         dashboardProjects.push({
           id: project.id,
@@ -254,15 +272,17 @@ export default function DashboardPage() {
           storiesCount: storyStats.totalStories,
           storiesInPlanning,
           storiesSprintReady,
-          completionRate: storyStats.completionRate,
+          storiesCompleted,
+          activeSprints,
+          completionRate: storyStats.totalStories > 0 ? parseFloat(((storiesCompleted / storyStats.totalStories) * 100).toFixed(2)) : 0,
           lastActivity: project.updatedAt
         })
       }
 
-      // Sort all stories by updatedAt and take the most recent 7
+      // Sort all stories by updatedAt and take the most recent 5
       const sortedRecentStories = allRecentStories
         .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-        .slice(0, 7)
+        .slice(0, 5)
 
       // Sort epics by urgency (overdue first, then by days remaining)
       const sortedEpicsWithDeadlines = allEpicsWithDeadlines
@@ -290,6 +310,9 @@ export default function DashboardPage() {
         totalStories,
         storiesInPlanning: totalStoriesInPlanning,
         storiesSprintReady: totalStoriesSprintReady,
+        storiesCompleted: totalStoriesCompleted,
+        activeSprints: totalActiveSprints,
+        completionRate: totalStories > 0 ? parseFloat(((totalStoriesCompleted / totalStories) * 100).toFixed(2)) : 0,
         overallVelocity,
         sprintReadiness
       })
@@ -308,11 +331,11 @@ export default function DashboardPage() {
 
   // Filter recent stories based on project selection
   const filteredRecentStories = selectedProjectId === 'all'
-    ? recentStories
+    ? recentStories.slice(0, 5)
     : recentStories.filter(story => {
         const project = projects.find(p => p.name === story.projectName)
         return project?.id === selectedProjectId
-      })
+      }).slice(0, 5)
 
   // Filter epics with deadlines based on project selection
   const filteredEpicsWithDeadlines = selectedProjectId === 'all'
@@ -321,6 +344,173 @@ export default function DashboardPage() {
         const project = projects.find(p => p.name === epic.projectName)
         return project?.id === selectedProjectId
       })
+
+  // Create epic breakdown data (only for single project view)
+  const [epicBreakdownData, setEpicBreakdownData] = useState<Array<{
+    id: string
+    name: string
+    color: string
+    status: string
+    storiesCount: number
+    backlogCount: number
+    planningCount: number
+    sprintReadyCount: number
+    completedCount: number
+    completionRate: number
+  }>>([])
+
+  const [sprintInsights, setSprintInsights] = useState<Array<{
+    projectId: string
+    projectName: string
+    totalSprints: number
+    completedSprints: number
+    activeSprints: number
+    totalStoriesCompleted: number
+    totalStoriesPushedBack: number
+    averageCompletionRate: number
+    sprintSuccessRate: number
+    recentSprintPerformance: 'improving' | 'declining' | 'stable'
+  }>>([])
+
+  // Fetch epic breakdown data when project selection changes
+  useEffect(() => {
+    const fetchEpicBreakdown = async () => {
+      if (selectedProjectId === 'all' || !user) {
+        setEpicBreakdownData([])
+        return
+      }
+
+      try {
+        const epics = await getEpicsByProject(selectedProjectId)
+        const breakdownData = await Promise.all(
+          epics.map(async (epic) => {
+            // Get all stories for this epic
+            const epicStories = await getStoriesByProject(selectedProjectId, {
+              epicId: epic.id
+            })
+
+            // Count stories by status
+            const backlogCount = epicStories.filter(s => s.status === 'backlog').length
+            const planningCount = epicStories.filter(s => s.status === 'planning').length
+            const sprintReadyCount = epicStories.filter(s => s.status === 'sprint_ready').length
+            const completedCount = epicStories.filter(s => s.status === 'completed').length
+            const storiesCount = epicStories.length
+
+            // Calculate completion rate
+            const completionRate = storiesCount > 0 ? (completedCount / storiesCount) * 100 : 0
+
+            return {
+              id: epic.id,
+              name: epic.name,
+              color: epic.color,
+              status: epic.status,
+              storiesCount,
+              backlogCount,
+              planningCount,
+              sprintReadyCount,
+              completedCount,
+              completionRate
+            }
+          })
+        )
+
+        setEpicBreakdownData(breakdownData)
+      } catch (error) {
+        console.error('Error fetching epic breakdown:', error)
+        setEpicBreakdownData([])
+      }
+    }
+
+    fetchEpicBreakdown()
+  }, [selectedProjectId, user])
+
+  // Fetch sprint insights data
+  useEffect(() => {
+    const fetchSprintInsights = async () => {
+      if (!user) {
+        setSprintInsights([])
+        return
+      }
+
+      try {
+        const projectsToAnalyze = selectedProjectId === 'all' ? projects : projects.filter(p => p.id === selectedProjectId)
+        
+        const insights = await Promise.all(
+          projectsToAnalyze.map(async (project) => {
+            // Get all sprints for this project
+            const allSprints = await getSprintsByProject(project.id, 100) // Get more for analysis
+            
+            const completedSprints = allSprints.filter(s => s.status === 'completed')
+            const activeSprints = allSprints.filter(s => s.status === 'active')
+            
+            // Calculate story completion stats from completed sprints
+            let totalStoriesCompleted = 0
+            let totalStoriesPushedBack = 0
+            let sprintCompletionRates: number[] = []
+            let fullySuccessfulSprints = 0
+            
+            completedSprints.forEach(sprint => {
+              const completedInSprint = sprint.stories.filter(s => s.sprintStatus === 'done').length
+              const totalInSprint = sprint.stories.length
+              const pushedBack = totalInSprint - completedInSprint
+              
+              totalStoriesCompleted += completedInSprint
+              totalStoriesPushedBack += pushedBack
+              
+              if (totalInSprint > 0) {
+                const completionRate = (completedInSprint / totalInSprint) * 100
+                sprintCompletionRates.push(completionRate)
+                
+                // Count sprints with 100% completion as fully successful
+                if (completionRate === 100) {
+                  fullySuccessfulSprints++
+                }
+              }
+            })
+            
+            const averageCompletionRate = sprintCompletionRates.length > 0 
+              ? parseFloat((sprintCompletionRates.reduce((a, b) => a + b, 0) / sprintCompletionRates.length).toFixed(1))
+              : 0
+            
+            const sprintSuccessRate = completedSprints.length > 0 
+              ? parseFloat(((fullySuccessfulSprints / completedSprints.length) * 100).toFixed(1))
+              : 0
+            
+            // Analyze recent performance trend (last 3 sprints vs previous 3)
+            let recentSprintPerformance: 'improving' | 'declining' | 'stable' = 'stable'
+            if (sprintCompletionRates.length >= 6) {
+              const recent3 = sprintCompletionRates.slice(-3).reduce((a, b) => a + b, 0) / 3
+              const previous3 = sprintCompletionRates.slice(-6, -3).reduce((a, b) => a + b, 0) / 3
+              const diff = recent3 - previous3
+              
+              if (diff > 5) recentSprintPerformance = 'improving'
+              else if (diff < -5) recentSprintPerformance = 'declining'
+            }
+            
+            return {
+              projectId: project.id,
+              projectName: project.name,
+              totalSprints: allSprints.length,
+              completedSprints: completedSprints.length,
+              activeSprints: activeSprints.length,
+              totalStoriesCompleted,
+              totalStoriesPushedBack,
+              averageCompletionRate,
+              sprintSuccessRate,
+              recentSprintPerformance
+            }
+          })
+        )
+        
+        setSprintInsights(insights)
+      } catch (error) {
+        console.error('Error fetching sprint insights:', error)
+        setSprintInsights([])
+      }
+    }
+
+    fetchSprintInsights()
+  }, [selectedProjectId, user, projects])
 
   // Calculate filtered stats
   const filteredStats = React.useMemo(() => {
@@ -337,6 +527,9 @@ export default function DashboardPage() {
       totalStories: project.storiesCount,
       storiesInPlanning: project.storiesInPlanning,
       storiesSprintReady: project.storiesSprintReady,
+      storiesCompleted: project.storiesCompleted,
+      activeSprints: project.activeSprints,
+      completionRate: project.storiesCount > 0 ? parseFloat(((project.storiesCompleted / project.storiesCount) * 100).toFixed(2)) : 0,
       overallVelocity: Math.round((project.storiesSprintReady / Math.max(project.storiesCount, 1)) * 100),
       sprintReadiness: Math.round((project.storiesInPlanning / Math.max(project.storiesCount, 1)) * 100)
     }
@@ -386,16 +579,44 @@ export default function DashboardPage() {
         </div>
 
         {/* Executive Summary Cards */}
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-8">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
-              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">
+                {selectedProjectId === 'all' ? 'Active Projects' : 'Active Epics'}
+              </CardTitle>
+              {selectedProjectId === 'all' ? (
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <Target className="h-4 w-4 text-muted-foreground" />
+              )}
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{loadingData ? '--' : filteredStats.activeProjects}</div>
+              <div className="text-2xl font-bold">
+                {loadingData ? '--' : (
+                  selectedProjectId === 'all' 
+                    ? filteredStats.activeProjects 
+                    : epicBreakdownData.filter(epic => epic.status === 'active').length
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
-                of {filteredStats.totalProjects} total
+                {selectedProjectId === 'all' 
+                  ? `of ${filteredStats.totalProjects} total`
+                  : `of ${epicBreakdownData.length} total`
+                }
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">In Planning</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{loadingData ? '--' : filteredStats.storiesInPlanning}</div>
+              <p className="text-xs text-muted-foreground">
+                need estimation
               </p>
             </CardContent>
           </Card>
@@ -408,7 +629,7 @@ export default function DashboardPage() {
             <CardContent>
               <div className="text-2xl font-bold">{loadingData ? '--' : filteredStats.storiesSprintReady}</div>
               <p className="text-xs text-muted-foreground">
-                {filteredStats.overallVelocity}% of stories
+                ready to sprint
               </p>
               <Progress value={filteredStats.overallVelocity} className="mt-2" />
             </CardContent>
@@ -416,13 +637,27 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">In Planning</CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">Remaining Work</CardTitle>
+              <AlertCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{loadingData ? '--' : filteredStats.storiesInPlanning}</div>
+              <div className="text-2xl font-bold text-orange-600">{loadingData ? '--' : (filteredStats.totalStories - filteredStats.storiesCompleted)}</div>
               <p className="text-xs text-muted-foreground">
-                Ready for estimation
+                {filteredStats.storiesCompleted} of {filteredStats.totalStories} completed ({filteredStats.completionRate.toFixed(1)}%)
+              </p>
+              <Progress value={filteredStats.completionRate} className="mt-2" />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Sprints</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">{loadingData ? '--' : filteredStats.activeSprints}</div>
+              <p className="text-xs text-muted-foreground">
+                active sprints running
               </p>
             </CardContent>
           </Card>
@@ -435,7 +670,7 @@ export default function DashboardPage() {
             <CardContent>
               <div className="text-2xl font-bold">{loadingData ? '--' : filteredStats.totalStories}</div>
               <p className="text-xs text-muted-foreground">
-                Across {filteredStats.totalEpics} epics
+                total across {filteredStats.totalEpics} epics
               </p>
             </CardContent>
           </Card>
@@ -461,58 +696,81 @@ export default function DashboardPage() {
               ) : (
                 <div className="space-y-6">
                   {/* Visual Pipeline */}
-                  <div className="relative">
-                    <div className="flex items-center justify-between">
-                      {/* Backlog */}
-                      <div className="text-center relative z-10">
-                        <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center mb-2 border-2 border-white dark:border-gray-900 shadow-sm">
-                          <FileText className="h-8 w-8 text-gray-600 dark:text-gray-400" />
-                        </div>
-                        <div className="text-sm font-medium">Backlog</div>
-                        <div className="text-2xl font-bold text-gray-600">
-                          {filteredStats.totalStories - filteredStats.storiesInPlanning - filteredStats.storiesSprintReady}
-                        </div>
+                  <div className="flex items-center justify-center gap-1 sm:gap-4">
+                    {/* Backlog */}
+                    <div className="flex flex-col items-center text-center">
+                      <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center mb-2 border-2 border-white dark:border-gray-900 shadow-sm">
+                        <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-gray-600 dark:text-gray-400" />
                       </div>
-                      
-                      {/* Planning */}
-                      <div className="text-center relative z-10">
-                        <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mb-2 border-2 border-white dark:border-gray-900 shadow-sm">
-                          <Clock className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-                        </div>
-                        <div className="text-sm font-medium">Planning</div>
-                        <div className="text-2xl font-bold text-blue-600">
-                          {filteredStats.storiesInPlanning}
-                        </div>
+                      <div className="text-sm font-medium">Backlog</div>
+                      <div className="text-2xl font-bold text-gray-600">
+                        {filteredStats.totalStories - filteredStats.storiesInPlanning - filteredStats.storiesSprintReady - filteredStats.storiesCompleted}
                       </div>
-                      
-                      {/* Sprint Ready */}
-                      <div className="text-center relative z-10">
-                        <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center mb-2 border-2 border-white dark:border-gray-900 shadow-sm">
-                          <Rocket className="h-8 w-8 text-green-600 dark:text-green-400" />
-                        </div>
-                        <div className="text-sm font-medium">Sprint Ready</div>
-                        <div className="text-2xl font-bold text-green-600">
-                          {filteredStats.storiesSprintReady}
-                        </div>
+                    </div>
+
+                    {/* Progress Bar 1 */}
+                    <div className="flex items-center -mt-12">
+                      <div className="w-8 sm:w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
+                        <div 
+                          className="h-2 bg-blue-500 rounded-full transition-all duration-500" 
+                          style={{ width: `${Math.min(100, (filteredStats.storiesInPlanning / Math.max(filteredStats.totalStories, 1)) * 100)}%` }}
+                        ></div>
                       </div>
                     </div>
                     
-                    {/* Progress Lines */}
-                    <div className="absolute top-8 left-0 right-0 flex items-center justify-between px-8">
-                      {/* First progress line */}
-                      <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full relative mx-4">
+                    {/* Planning */}
+                    <div className="flex flex-col items-center text-center">
+                      <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mb-2 border-2 border-white dark:border-gray-900 shadow-sm">
+                        <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="text-sm font-medium">Planning</div>
+                      <div className="text-2xl font-bold text-blue-600">
+                        {filteredStats.storiesInPlanning}
+                      </div>
+                    </div>
+
+                    {/* Progress Bar 2 */}
+                    <div className="flex items-center -mt-12">
+                      <div className="w-8 sm:w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
                         <div 
-                          className="absolute inset-y-0 left-0 bg-blue-500 rounded-full transition-all duration-500" 
-                          style={{ width: `${Math.min(100, (filteredStats.storiesInPlanning / Math.max(filteredStats.totalStories, 1)) * 100 * 3)}%` }}
+                          className="h-2 bg-green-500 rounded-full transition-all duration-500" 
+                          style={{ width: `${Math.min(100, (filteredStats.storiesSprintReady / Math.max(filteredStats.totalStories, 1)) * 100)}%` }}
                         ></div>
                       </div>
-                      
-                      {/* Second progress line */}
-                      <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full relative mx-4">
+                    </div>
+                    
+                    {/* Sprint Ready */}
+                    <div className="flex flex-col items-center text-center">
+                      <div className="w-12 h-12 sm:w-16 sm:h-16 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center mb-2 border-2 border-white dark:border-gray-900 shadow-sm">
+                        <Rocket className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div className="text-sm font-medium">
+                        <span className="sm:hidden">Ready</span>
+                        <span className="hidden sm:inline">Sprint Ready</span>
+                      </div>
+                      <div className="text-2xl font-bold text-green-600">
+                        {filteredStats.storiesSprintReady}
+                      </div>
+                    </div>
+
+                    {/* Progress Bar 3 */}
+                    <div className="flex items-center -mt-12">
+                      <div className="w-8 sm:w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full">
                         <div 
-                          className="absolute inset-y-0 left-0 bg-green-500 rounded-full transition-all duration-500" 
-                          style={{ width: `${Math.min(100, (filteredStats.storiesSprintReady / Math.max(filteredStats.totalStories, 1)) * 100 * 2)}%` }}
+                          className="h-2 bg-purple-500 rounded-full transition-all duration-500" 
+                          style={{ width: `${Math.min(100, (filteredStats.storiesCompleted / Math.max(filteredStats.totalStories, 1)) * 100)}%` }}
                         ></div>
+                      </div>
+                    </div>
+                    
+                    {/* Completed */}
+                    <div className="flex flex-col items-center text-center">
+                      <div className="w-12 h-12 sm:w-16 sm:h-16 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center mb-2 border-2 border-white dark:border-gray-900 shadow-sm">
+                        <CheckCircle2 className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <div className="text-sm font-medium">Completed</div>
+                      <div className="text-2xl font-bold text-purple-600">
+                        {filteredStats.storiesCompleted}
                       </div>
                     </div>
                   </div>
@@ -718,15 +976,15 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* Project Portfolio */}
-        <Card>
+        {/* Sprint Insights */}
+        <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Project Portfolio
+              <Calendar className="h-5 w-5" />
+              Sprint Insights
             </CardTitle>
             <CardDescription>
-              Overview of all projects and their progress
+              Sprint performance and story completion metrics
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -734,82 +992,196 @@ export default function DashboardPage() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin" />
               </div>
-            ) : filteredProjects.length === 0 ? (
+            ) : sprintInsights.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No sprint data available yet. Complete your first sprint to see insights.
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {sprintInsights.map((insight) => (
+                  <div key={insight.projectId} className="border rounded-lg p-4">
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h4 className="font-medium text-lg">{insight.projectName}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {insight.totalSprints} total sprint{insight.totalSprints !== 1 ? 's' : ''} • 
+                          {insight.completedSprints} completed • 
+                          {insight.activeSprints} active
+                        </p>
+                      </div>
+                      <Badge variant={
+                        insight.recentSprintPerformance === 'improving' ? 'default' :
+                        insight.recentSprintPerformance === 'declining' ? 'destructive' : 'secondary'
+                      }>
+                        {insight.recentSprintPerformance === 'improving' && <TrendingUp className="h-3 w-3 mr-1" />}
+                        {insight.recentSprintPerformance === 'declining' && <TrendingUp className="h-3 w-3 mr-1 rotate-180" />}
+                        {insight.recentSprintPerformance === 'stable' && <Activity className="h-3 w-3 mr-1" />}
+                        {insight.recentSprintPerformance === 'improving' ? 'Improving' :
+                         insight.recentSprintPerformance === 'declining' ? 'Declining' : 'Stable'}
+                      </Badge>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">
+                          {insight.totalStoriesCompleted}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Stories Completed</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-orange-600">
+                          {insight.totalStoriesPushedBack}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {insight.totalStoriesPushedBack === 1 ? 'Story' : 'Stories'} Pushed to Backlog
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {insight.averageCompletionRate}%
+                        </div>
+                        <div className="text-xs text-muted-foreground">Avg Story Completion per Sprint</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-purple-600">
+                          {insight.completedSprints > 0 ? Math.round(insight.totalStoriesCompleted / insight.completedSprints) : 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Avg Stories Completed per Sprint</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Epic Breakdown */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5" />
+              Epic Breakdown
+            </CardTitle>
+            <CardDescription>
+              Story progress across epics
+              {selectedProjectId !== 'all' && (
+                <span> in {projects.find(p => p.id === selectedProjectId)?.name}</span>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingData ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : selectedProjectId === 'all' ? (
               <div className="text-center py-12">
-                <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium mb-2">No Projects Found</h3>
+                <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">Select a Project</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Create your first project to get started with story management
+                  Choose a specific project to see epic-level story breakdown
+                </p>
+              </div>
+            ) : epicBreakdownData.length === 0 ? (
+              <div className="text-center py-12">
+                <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">No Epics Found</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Create epics to organize your stories and track progress
                 </p>
                 <Button asChild>
-                  <Link href="/projects">
+                  <Link href={`/epics?project=${selectedProjectId}`}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Create Project
+                    Create Epic
                   </Link>
                 </Button>
               </div>
             ) : (
-              <div className="space-y-4">
-                {filteredProjects.map((project) => (
-                  <div key={project.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
+              <div className="grid gap-4 lg:grid-cols-2">
+                {epicBreakdownData.map((epic) => (
+                  <div key={epic.id} className="border rounded-lg p-4 hover:bg-muted/50 transition-colors">
                     <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold text-lg">{project.name}</h3>
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{project.description}</p>
+                      <div className="flex items-center gap-3">
+                        <div 
+                          className="w-8 h-8 rounded-md flex items-center justify-center text-sm flex-shrink-0"
+                          style={{ backgroundColor: epic.color + '20', color: epic.color }}
+                        >
+                          <Target className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-lg">{epic.name}</h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="secondary" className="text-xs">
+                              {epic.status}
+                            </Badge>
+                          </div>
+                        </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-sm font-medium">{project.completionRate.toFixed(0)}% Ready</div>
+                        <div className="text-sm font-medium">{epic.completionRate.toFixed(0)}% Complete</div>
                         <div className="text-xs text-muted-foreground">
-                          Updated {new Date(project.lastActivity).toLocaleDateString()}
+                          {epic.storiesCount} total stories
                         </div>
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-4 gap-4 mb-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
                       <div className="text-center">
-                        <div className="text-lg font-semibold">{project.epicsCount}</div>
-                        <div className="text-xs text-muted-foreground">Epics</div>
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <FileText className="h-3 w-3 text-gray-600" />
+                          <div className="text-lg font-semibold text-gray-600">{epic.backlogCount}</div>
+                        </div>
+                        <div className="text-xs text-muted-foreground">Backlog</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-lg font-semibold">{project.storiesCount}</div>
-                        <div className="text-xs text-muted-foreground">Stories</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-lg font-semibold text-blue-600">{project.storiesInPlanning}</div>
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <Clock className="h-3 w-3 text-blue-600" />
+                          <div className="text-lg font-semibold text-blue-600">{epic.planningCount}</div>
+                        </div>
                         <div className="text-xs text-muted-foreground">Planning</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-lg font-semibold text-green-600">{project.storiesSprintReady}</div>
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <Rocket className="h-3 w-3 text-green-600" />
+                          <div className="text-lg font-semibold text-green-600">{epic.sprintReadyCount}</div>
+                        </div>
                         <div className="text-xs text-muted-foreground">Sprint Ready</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <CheckCircle2 className="h-3 w-3 text-purple-600" />
+                          <div className="text-lg font-semibold text-purple-600">{epic.completedCount}</div>
+                        </div>
+                        <div className="text-xs text-muted-foreground">Completed</div>
                       </div>
                     </div>
                     
                     <div className="space-y-2">
-                      <Progress value={(project.storiesSprintReady / Math.max(project.storiesCount, 1)) * 100} className="h-2" />
+                      <Progress value={epic.completionRate} className="h-0.5 sm:h-2" />
                       <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>Sprint Ready Progress</span>
-                        <span>{Math.round((project.storiesSprintReady / Math.max(project.storiesCount, 1)) * 100)}%</span>
+                        <span>Epic Completion</span>
+                        <span>{epic.completionRate.toFixed(1)}%</span>
                       </div>
                     </div>
 
                     <div className="flex gap-2 mt-3">
-                      {/* Mobile: Show only 2 most important buttons */}
-                      <Button asChild size="sm" variant="outline" className="flex-1 sm:flex-initial">
-                        <Link href={`/stories?project=${project.id}`}>
-                          <span className="sm:hidden">Stories</span>
-                          <span className="hidden sm:inline">Manage Stories</span>
+                      <Button asChild size="sm" variant="outline" className="flex-1">
+                        <Link href={`/stories?project=${selectedProjectId}&epic=${epic.id}`}>
+                          <FileText className="mr-1 h-3 w-3" />
+                          <span className="text-xs">Stories</span>
                         </Link>
                       </Button>
-                      <Button asChild size="sm" variant="outline" className="flex-1 sm:flex-initial">
-                        <Link href={`/planning?project=${project.id}`}>
-                          <span className="sm:hidden">Estimate</span>
-                          <span className="hidden sm:inline">Estimate Stories</span>
+                      <Button asChild size="sm" variant="outline" className="flex-1">
+                        <Link href={`/epics?project=${selectedProjectId}`}>
+                          <Target className="mr-1 h-3 w-3" />
+                          <span className="text-xs">Edit</span>
                         </Link>
                       </Button>
-                      {/* Desktop: Show third button */}
-                      <Button asChild size="sm" variant="outline" className="hidden sm:inline-flex">
-                        <Link href={`/epics?project=${project.id}`}>
-                          View Epics
+                      <Button asChild size="sm" variant="outline" className="flex-1">
+                        <Link href={`/planning?project=${selectedProjectId}&epic=${epic.id}`}>
+                          <Users className="mr-1 h-3 w-3" />
+                          <span className="text-xs">Plan</span>
                         </Link>
                       </Button>
                     </div>
