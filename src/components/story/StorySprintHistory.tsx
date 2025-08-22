@@ -27,7 +27,7 @@ export function StorySprintHistory({ sprintAttempts }: StorySprintHistoryProps) 
     return null
   }
 
-  const formatDate = (date: Date | any) => {
+  const formatDate = (date: Date | { toDate?: () => Date } | string | number) => {
     if (!date) return 'Unknown'
     
     // Handle Firestore Timestamp objects
@@ -204,7 +204,7 @@ export function StorySprintHistory({ sprintAttempts }: StorySprintHistoryProps) 
                 {attempt.retrospectiveNotes && (
                   <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-2">
                     <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-1">
-                      Why this story couldn't be completed:
+                      Why this story couldn&apos;t be completed:
                     </p>
                     <p className="text-sm text-yellow-700 dark:text-yellow-300 whitespace-pre-wrap">
                       {attempt.retrospectiveNotes}

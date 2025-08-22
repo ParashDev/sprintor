@@ -785,8 +785,8 @@ export async function removeSprintParticipant(sprintId: string, participantId: s
 // === SPRINT COMPLETION ===
 
 // Helper to convert SprintAttempt for Firestore (convert dates to Timestamps)
-function convertSprintAttemptForFirestore(attempt: SprintAttempt): any {
-  const converted: any = {
+function convertSprintAttemptForFirestore(attempt: SprintAttempt): Record<string, unknown> {
+  const converted: Record<string, unknown> = {
     ...attempt,
     sprintStartDate: Timestamp.fromDate(new Date(attempt.sprintStartDate)),
     sprintEndDate: Timestamp.fromDate(new Date(attempt.sprintEndDate)),
@@ -796,7 +796,7 @@ function convertSprintAttemptForFirestore(attempt: SprintAttempt): any {
   
   // Convert dates in nested arrays
   if (attempt.stagesCompleted) {
-    converted.stagesCompleted = attempt.stagesCompleted.map((stage: any) => ({
+    converted.stagesCompleted = attempt.stagesCompleted.map((stage) => ({
       ...stage,
       enteredAt: Timestamp.fromDate(new Date(stage.enteredAt)),
       exitedAt: stage.exitedAt ? Timestamp.fromDate(new Date(stage.exitedAt)) : null
@@ -804,7 +804,7 @@ function convertSprintAttemptForFirestore(attempt: SprintAttempt): any {
   }
   
   if (attempt.assignments) {
-    converted.assignments = attempt.assignments.map((assignment: any) => ({
+    converted.assignments = attempt.assignments.map((assignment) => ({
       ...assignment,
       assignedAt: Timestamp.fromDate(new Date(assignment.assignedAt)),
       unassignedAt: assignment.unassignedAt ? Timestamp.fromDate(new Date(assignment.unassignedAt)) : null
@@ -812,7 +812,7 @@ function convertSprintAttemptForFirestore(attempt: SprintAttempt): any {
   }
   
   if (attempt.blockersEncountered) {
-    converted.blockersEncountered = attempt.blockersEncountered.map((blocker: any) => ({
+    converted.blockersEncountered = attempt.blockersEncountered.map((blocker) => ({
       ...blocker,
       reportedAt: Timestamp.fromDate(new Date(blocker.reportedAt)),
       resolvedAt: blocker.resolvedAt ? Timestamp.fromDate(new Date(blocker.resolvedAt)) : null
@@ -820,7 +820,7 @@ function convertSprintAttemptForFirestore(attempt: SprintAttempt): any {
   }
   
   if (attempt.scopeChanges) {
-    converted.scopeChanges = attempt.scopeChanges.map((change: any) => ({
+    converted.scopeChanges = attempt.scopeChanges.map((change) => ({
       ...change,
       changedAt: Timestamp.fromDate(new Date(change.changedAt))
     }))

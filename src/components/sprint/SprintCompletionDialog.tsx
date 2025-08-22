@@ -185,7 +185,7 @@ export function SprintCompletionDialog({
                     Story-Specific Retrospective Notes
                   </h4>
                   <p className="text-xs text-muted-foreground">
-                    Add notes for why each story couldn't be completed. This helps with future estimation.
+                    Add notes for why each story couldn&apos;t be completed. This helps with future estimation.
                   </p>
                   <div className="space-y-3 max-h-64 overflow-y-auto">
                     {incompleteStories.map(story => (
@@ -256,8 +256,8 @@ export function SprintCompletionDialog({
             <AlertDescription>
               <strong>What happens when you complete this sprint:</strong>
               <ul className="mt-2 space-y-1 text-sm">
-                <li>• Completed stories will move to "completed" status and won't appear in future sprints</li>
-                <li>• Incomplete stories will return to "backlog" status for re-grooming</li>
+                <li>• Completed stories will move to &quot;completed&quot; status and won&apos;t appear in future sprints</li>
+                <li>• Incomplete stories will return to &quot;backlog&quot; status for re-grooming</li>
                 <li>• Sprint attempt history will be preserved for all stories</li>
                 <li>• Sprint board will become read-only for historical reference</li>
                 <li>• Sprint metrics will be calculated and archived</li>
