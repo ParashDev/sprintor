@@ -446,7 +446,7 @@ export default function DashboardPage() {
             // Calculate story completion stats from completed sprints
             let totalStoriesCompleted = 0
             let totalStoriesPushedBack = 0
-            let sprintCompletionRates: number[] = []
+            const sprintCompletionRates: number[] = []
             let fullySuccessfulSprints = 0
             
             completedSprints.forEach(sprint => {
