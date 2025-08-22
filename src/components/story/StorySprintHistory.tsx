@@ -36,8 +36,11 @@ export function StorySprintHistory({ sprintAttempts }: StorySprintHistoryProps) 
       dateObj = date.toDate()
     } else if (date instanceof Date) {
       dateObj = date
-    } else {
+    } else if (typeof date === 'string' || typeof date === 'number') {
       dateObj = new Date(date)
+    } else {
+      // Fallback for unexpected types
+      dateObj = new Date()
     }
     
     // Check if date is valid
