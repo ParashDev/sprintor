@@ -52,6 +52,7 @@ function getStatusColor(status: string): string {
     case 'backlog': return 'text-gray-600 dark:text-gray-400'
     case 'planning': return 'text-blue-600 dark:text-blue-400'
     case 'sprint_ready': return 'text-green-600 dark:text-green-400'
+    case 'completed': return 'text-purple-600 dark:text-purple-400'
     default: return 'text-gray-600 dark:text-gray-400'
   }
 }
@@ -62,6 +63,7 @@ function getStatusLabel(status: string): string {
     case 'backlog': return 'Backlog'
     case 'planning': return 'Planning'
     case 'sprint_ready': return 'Sprint Ready'
+    case 'completed': return 'Completed'
     default: return status
   }
 }
@@ -136,7 +138,7 @@ interface ProjectStats {
 interface RecentStory {
   id: string
   title: string
-  status: 'backlog' | 'planning' | 'sprint_ready'
+  status: 'backlog' | 'planning' | 'sprint_ready' | 'completed'
   updatedAt: Date
   projectName: string
   epicId?: string
