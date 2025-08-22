@@ -42,7 +42,8 @@ import {
   Smartphone,
   Star,
   Building2,
-  Lock
+  Lock,
+  Unlock
 } from "lucide-react"
 import { StoryDetailModal } from "@/components/StoryDetailModal"
 
@@ -100,11 +101,12 @@ interface Project {
   companyName: string
 }
 
-// Kanban columns configuration - Simplified for story preparation workflow
+// Kanban columns configuration - Complete story lifecycle
 const KANBAN_COLUMNS = [
   { id: 'backlog', title: 'Backlog', color: 'bg-gray-100 dark:bg-gray-800' },
   { id: 'planning', title: 'Planning', color: 'bg-blue-100 dark:bg-blue-900/20' },
-  { id: 'sprint_ready', title: 'Sprint Ready', color: 'bg-green-100 dark:bg-green-900/20' }
+  { id: 'sprint_ready', title: 'Sprint Ready', color: 'bg-green-100 dark:bg-green-900/20' },
+  { id: 'completed', title: 'Completed', color: 'bg-purple-100 dark:bg-purple-900/20' }
 ]
 
 // Memoized content component (prevents re-renders during drag)
@@ -113,13 +115,19 @@ const StoryCardContent = React.memo(function StoryCardContent({
   onEdit, 
   onDelete,
   onViewDetails,
-  isDeleting
+  isDeleting,
+  onUnlock,
+  onLock,
+  isUnlocked
 }: {
   story: Story
   onEdit: (story: Story) => void
   onDelete: (story: Story) => void
   onViewDetails: (story: Story) => void
   isDeleting: boolean
+  onUnlock?: (storyId: string) => void
+  onLock?: (storyId: string) => void
+  isUnlocked?: boolean
 }) {
   const getTypeIcon = useCallback((type: string) => {
     switch (type) {
@@ -194,7 +202,29 @@ const StoryCardContent = React.memo(function StoryCardContent({
       
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span className="font-mono">#{story.id.split('_').pop()}</span>
-        <span>{story.acceptanceCriteria.length} AC</span>
+        <div className="flex items-center gap-2">
+          <span>{story.acceptanceCriteria.length} AC</span>
+          {story.status === 'completed' && onUnlock && onLock && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                if (isUnlocked) {
+                  onLock(story.id)
+                } else {
+                  onUnlock(story.id)
+                }
+              }}
+              className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+                isUnlocked
+                  ? 'bg-red-500 text-white hover:bg-red-600'
+                  : 'bg-gray-400 text-white hover:bg-gray-500'
+              }`}
+              title={isUnlocked ? 'Lock story (prevent accidental moves)' : 'Unlock story (allow moving out of completed)'}
+            >
+              {isUnlocked ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+            </button>
+          )}
+        </div>
       </div>
     </>
   )
@@ -207,9 +237,24 @@ interface StoryCardProps {
   onDelete: (story: Story) => void
   onViewDetails: (story: Story) => void
   isDeleting: boolean
+  onUnlock?: (storyId: string) => void
+  onLock?: (storyId: string) => void
+  isUnlocked?: boolean
 }
 
-const StoryCard = function StoryCard({ story, onEdit, onDelete, onViewDetails, isDeleting }: StoryCardProps) {
+const StoryCard = function StoryCard({ 
+  story, 
+  onEdit, 
+  onDelete, 
+  onViewDetails, 
+  isDeleting, 
+  onUnlock, 
+  onLock, 
+  isUnlocked = false 
+}: StoryCardProps) {
+  const isCompleted = story.status === 'completed'
+  const canDrag = !isCompleted || isUnlocked
+  
   const {
     attributes,
     listeners,
@@ -218,7 +263,8 @@ const StoryCard = function StoryCard({ story, onEdit, onDelete, onViewDetails, i
     transition,
     isDragging
   } = useSortable({ 
-    id: story.id
+    id: story.id,
+    disabled: !canDrag // Can drag if not completed, or if completed and unlocked
   })
 
   const style = useMemo(() => ({
@@ -230,10 +276,16 @@ const StoryCard = function StoryCard({ story, onEdit, onDelete, onViewDetails, i
   return (
     <div
       ref={setNodeRef}
-      style={{...style, touchAction: 'none'}}
-      className="bg-white dark:bg-gray-800 border rounded-lg p-3 mb-3 shadow-sm cursor-grab active:cursor-grabbing"
-      {...attributes}
-      {...listeners}
+      style={{...style, touchAction: canDrag ? 'none' : 'auto'}}
+      className={`bg-white dark:bg-gray-800 border rounded-lg p-3 mb-3 shadow-sm relative ${
+        isCompleted && !isUnlocked
+          ? 'opacity-75' // Slightly faded for locked completed stories
+          : isCompleted && isUnlocked 
+          ? 'ring-2 ring-red-400 ring-opacity-50 cursor-grab active:cursor-grabbing' // Highlight unlocked stories with grab cursor
+          : 'cursor-grab active:cursor-grabbing'
+      }`}
+      {...(canDrag ? attributes : {})}
+      {...(canDrag ? listeners : {})}
     >
       <StoryCardContent 
         story={story} 
@@ -241,6 +293,9 @@ const StoryCard = function StoryCard({ story, onEdit, onDelete, onViewDetails, i
         onDelete={onDelete}
         onViewDetails={onViewDetails}
         isDeleting={isDeleting}
+        onUnlock={onUnlock}
+        onLock={onLock}
+        isUnlocked={isUnlocked}
       />
     </div>
   )
@@ -255,9 +310,12 @@ interface DroppableColumnProps {
   onViewDetails: (story: Story) => void
   isDeleting: boolean
   deletingStoryId: string
+  onUnlock?: (storyId: string) => void
+  onLock?: (storyId: string) => void
+  unlockedStories?: Set<string>
 }
 
-const DroppableColumn = React.memo(function DroppableColumn({ column, stories, onEdit, onDelete, onViewDetails, isDeleting, deletingStoryId }: DroppableColumnProps) {
+const DroppableColumn = React.memo(function DroppableColumn({ column, stories, onEdit, onDelete, onViewDetails, isDeleting, deletingStoryId, onUnlock, onLock, unlockedStories }: DroppableColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
   })
@@ -295,6 +353,9 @@ const DroppableColumn = React.memo(function DroppableColumn({ column, stories, o
                   onDelete={onDelete}
                   onViewDetails={onViewDetails}
                   isDeleting={isDeleting && deletingStoryId === story.id}
+                  onUnlock={onUnlock}
+                  onLock={onLock}
+                  isUnlocked={unlockedStories?.has(story.id) || false}
                 />
               ))}
               {stories.length === 0 && (
@@ -324,6 +385,7 @@ function StoriesContent() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [loadingProjects, setLoadingProjects] = useState(true)
+  const [unlockedCompletedStories, setUnlockedCompletedStories] = useState<Set<string>>(new Set())
   
   // Epic state
   const [epics, setEpics] = useState<Epic[]>([])
@@ -604,11 +666,37 @@ function StoriesContent() {
     setDeletingStoryId('')
   }
 
+  // Handle unlocking completed stories for editing
+  const handleUnlockCompletedStory = (storyId: string) => {
+    setUnlockedCompletedStories(prev => new Set(prev).add(storyId))
+  }
+
+  const handleLockCompletedStory = (storyId: string) => {
+    setUnlockedCompletedStories(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(storyId)
+      return newSet
+    })
+  }
+
 
   // Separate async function to avoid blocking drag handler
   const updateStoryAsync = useCallback(async (storyId: string, newStatus: Story['status'], originalStatus: Story['status']) => {
     try {
-      await updateStory(storyId, { status: newStatus })
+      // Prepare update data
+      const updateData: Partial<Story> = { status: newStatus }
+      
+      // Set completedAt timestamp when moving to completed status
+      if (newStatus === 'completed') {
+        updateData.completedAt = new Date()
+      }
+      
+      // Clear completedAt timestamp when moving out of completed status
+      if (originalStatus === 'completed' && newStatus !== 'completed') {
+        updateData.completedAt = null
+      }
+      
+      await updateStory(storyId, updateData)
       
       // Update stats in background
       if (selectedProject) {
@@ -648,7 +736,7 @@ function StoriesContent() {
 
     // Ultra-fast validation
     if (!newStatus || newStatus.startsWith('story_') || 
-        !['backlog', 'planning', 'sprint_ready'].includes(newStatus)) {
+        !['backlog', 'planning', 'sprint_ready', 'completed'].includes(newStatus)) {
       return
     }
 
@@ -662,6 +750,20 @@ function StoriesContent() {
     }
     
     if (!targetStory || targetStory.status === newStatus) return
+
+    // Prevent dragging from completed status unless unlocked
+    if (targetStory.status === 'completed' && !unlockedCompletedStories.has(storyId)) {
+      return
+    }
+
+    // Auto-lock story if moving out of completed status
+    if (targetStory.status === 'completed' && unlockedCompletedStories.has(storyId)) {
+      setUnlockedCompletedStories(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(storyId)
+        return newSet
+      })
+    }
 
     // Immediate UI update with minimal computation
     setStories(prev => {
@@ -685,7 +787,8 @@ function StoriesContent() {
     const grouped: Record<string, Story[]> = {
       backlog: [],
       planning: [],
-      sprint_ready: []
+      sprint_ready: [],
+      completed: []
     }
 
     const searchLower = searchQuery.toLowerCase().trim()
@@ -747,8 +850,8 @@ function StoriesContent() {
         storiesWithPoints++
       }
       
-      // Count completed stories (sprint ready)
-      if (story.status === 'sprint_ready') {
+      // Count completed stories
+      if (story.status === 'completed') {
         completedStories++
       }
     })
@@ -981,8 +1084,8 @@ function StoriesContent() {
             onDragEnd={handleDragEnd}
             autoScroll={false}
           >
-            {/* Mobile: Vertical Stack / Desktop: 3-Column Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            {/* Mobile: Vertical Stack / Desktop: 4-Column Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
               {KANBAN_COLUMNS.map((column) => (
                 <DroppableColumn
                   key={column.id}
@@ -993,6 +1096,9 @@ function StoriesContent() {
                   onViewDetails={handleViewStoryDetails}
                   isDeleting={isDeleting}
                   deletingStoryId={deletingStoryId}
+                  onUnlock={handleUnlockCompletedStory}
+                  onLock={handleLockCompletedStory}
+                  unlockedStories={unlockedCompletedStories}
                 />
               ))}
             </div>
@@ -1007,6 +1113,9 @@ function StoriesContent() {
                     onDelete={() => {}}
                     onViewDetails={() => {}}
                     isDeleting={false}
+                    onUnlock={undefined}
+                    onLock={undefined}
+                    isUnlocked={false}
                   />
                 </div>
               ) : null}

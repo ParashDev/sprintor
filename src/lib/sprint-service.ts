@@ -31,10 +31,14 @@ import type {
   FirestoreSprint,
   FirestoreSprintStory,
   SprintMetrics,
-  SprintColumn
+  SprintColumn,
+  CompleteSprintRequest,
+  SprintCompletionResult,
+  StoryReversionDetails
 } from '@/types/sprint'
-import type { Story } from '@/types/story'
-import { getStoriesByProject } from './story-service'
+import type { Story, SprintAttempt } from '@/types/story'
+import { getStoriesByProject, getStory, updateStory } from './story-service'
+import { updateEpicStoryCounts } from './epic-service'
 // === UTILITY FUNCTIONS ===
 
 // Generate unique IDs
@@ -775,5 +779,321 @@ export async function removeSprintParticipant(sprintId: string, participantId: s
   } catch (error) {
     console.error('Error removing sprint participant:', error)
     throw new Error('Failed to remove participant')
+  }
+}
+
+// === SPRINT COMPLETION ===
+
+// Helper to convert SprintAttempt for Firestore (convert dates to Timestamps)
+function convertSprintAttemptForFirestore(attempt: SprintAttempt): any {
+  const converted: any = {
+    ...attempt,
+    sprintStartDate: Timestamp.fromDate(new Date(attempt.sprintStartDate)),
+    sprintEndDate: Timestamp.fromDate(new Date(attempt.sprintEndDate)),
+    attemptedAt: Timestamp.fromDate(new Date(attempt.attemptedAt)),
+    lastUpdatedAt: Timestamp.fromDate(new Date(attempt.lastUpdatedAt))
+  }
+  
+  // Convert dates in nested arrays
+  if (attempt.stagesCompleted) {
+    converted.stagesCompleted = attempt.stagesCompleted.map((stage: any) => ({
+      ...stage,
+      enteredAt: Timestamp.fromDate(new Date(stage.enteredAt)),
+      exitedAt: stage.exitedAt ? Timestamp.fromDate(new Date(stage.exitedAt)) : null
+    }))
+  }
+  
+  if (attempt.assignments) {
+    converted.assignments = attempt.assignments.map((assignment: any) => ({
+      ...assignment,
+      assignedAt: Timestamp.fromDate(new Date(assignment.assignedAt)),
+      unassignedAt: assignment.unassignedAt ? Timestamp.fromDate(new Date(assignment.unassignedAt)) : null
+    }))
+  }
+  
+  if (attempt.blockersEncountered) {
+    converted.blockersEncountered = attempt.blockersEncountered.map((blocker: any) => ({
+      ...blocker,
+      reportedAt: Timestamp.fromDate(new Date(blocker.reportedAt)),
+      resolvedAt: blocker.resolvedAt ? Timestamp.fromDate(new Date(blocker.resolvedAt)) : null
+    }))
+  }
+  
+  if (attempt.scopeChanges) {
+    converted.scopeChanges = attempt.scopeChanges.map((change: any) => ({
+      ...change,
+      changedAt: Timestamp.fromDate(new Date(change.changedAt))
+    }))
+  }
+  
+  if (attempt.completedAt) {
+    converted.completedAt = Timestamp.fromDate(new Date(attempt.completedAt))
+  }
+  
+  // Remove undefined values
+  Object.keys(converted).forEach(key => {
+    if (converted[key] === undefined) {
+      delete converted[key]
+    }
+  })
+  
+  return converted
+}
+
+// Complete a sprint and handle story reversion
+export async function completeSprint(request: CompleteSprintRequest): Promise<SprintCompletionResult> {
+  try {
+    const sprint = await getSprint(request.sprintId)
+    if (!sprint) throw new Error('Sprint not found')
+    
+    if (sprint.status === 'completed' || sprint.status === 'cancelled') {
+      throw new Error('Sprint is already completed or cancelled')
+    }
+    
+    // Calculate sprint metrics before completion
+    const metrics = await calculateSprintMetrics(request.sprintId)
+    
+    // Categorize stories
+    const completedStories: SprintStory[] = []
+    const incompleteStories: SprintStory[] = []
+    
+    sprint.stories.forEach(story => {
+      if (story.sprintStatus === 'done') {
+        completedStories.push(story)
+      } else {
+        incompleteStories.push(story)
+      }
+    })
+    
+    // Track epic impacts
+    const epicImpacts = new Map<string, { storiesReturned: number, progressImpact: number }>()
+    const revertedStoryIds: string[] = []
+    
+    // Start a batch operation for atomic updates
+    const batch = writeBatch(db)
+    
+    // Process incomplete stories - revert to backlog with history
+    for (const sprintStory of incompleteStories) {
+      const projectStory = await getStory(sprintStory.originalStoryId)
+      if (!projectStory) continue
+      
+      // Create sprint attempt record
+      const sprintAttempt: SprintAttempt = {
+        // Sprint Context
+        sprintId: sprint.id,
+        sprintName: sprint.name,
+        sprintGoal: sprint.goal,
+        sprintStartDate: sprint.startDate,
+        sprintEndDate: sprint.endDate,
+        sprintDuration: sprint.duration,
+        
+        // Estimation Context
+        originalStoryPoints: sprintStory.storyPoints,
+        estimationConfidence: 'Medium',
+        
+        // Progress Tracking
+        statusReached: sprintStory.sprintStatus,
+        progressPercentage: sprintStory.progress,
+        stagesCompleted: sprintStory.statusHistory.map(sh => ({
+          stage: sh.toStatus as 'todo' | 'in_progress' | 'review' | 'testing' | 'done',
+          enteredAt: sh.timestamp,
+          exitedAt: sh.timestamp,
+          timeSpent: 0 // Would need more tracking for accurate time
+        })),
+        
+        // Assignment History
+        assignments: sprintStory.assignedTo ? [{
+          assignedTo: sprintStory.assignedTo,
+          assignedToName: sprintStory.assignedToName || '',
+          assignedAt: sprintStory.startedAt || sprintStory.addedToSprintAt,
+          unassignedAt: undefined,
+          reason: 'Sprint ended'
+        }] : [],
+        
+        // Completion Details
+        completionStatus: 'incomplete',
+        completionReason: request.completionReason === 'manual' ? 'sprint_ended' : 'sprint_ended',
+        incompleteReason: `Sprint ${request.completionReason === 'expired' ? 'expired' : 'ended manually'}`,
+        
+        // Blockers
+        blockersEncountered: sprintStory.blockers.map(b => ({
+          description: b.description,
+          type: b.type,
+          severity: b.severity,
+          reportedAt: b.createdAt,
+          resolvedAt: b.resolvedAt,
+          impactHours: undefined,
+          resolution: b.resolvedAt ? 'Resolved' : undefined
+        })),
+        
+        // Scope Changes
+        scopeChanges: [],
+        
+        // Learning & Insights - Use story-specific notes if available, fall back to global notes
+        retrospectiveNotes: request.storyNotes?.[sprintStory.originalStoryId] || request.retrospectiveNotes,
+        lessonsLearned: request.lessonsLearned,
+        
+        // Metrics
+        cycleTime: sprintStory.completedAt && sprintStory.startedAt 
+          ? (sprintStory.completedAt.getTime() - sprintStory.startedAt.getTime()) / (1000 * 60 * 60)
+          : undefined,
+        leadTime: sprintStory.completedAt 
+          ? (sprintStory.completedAt.getTime() - sprintStory.addedToSprintAt.getTime()) / (1000 * 60 * 60)
+          : undefined,
+        reworkCount: 0,
+        
+        // Metadata
+        attemptNumber: (projectStory.sprintAttempts?.length || 0) + 1,
+        attemptedAt: sprintStory.addedToSprintAt,
+        lastUpdatedAt: new Date()
+      }
+      
+      // Convert sprint attempt for Firestore
+      const firestoreSprintAttempt = convertSprintAttemptForFirestore(sprintAttempt)
+      
+      // Update story in batch: revert status to backlog and add sprint attempt
+      const storyRef = doc(db, 'stories', sprintStory.originalStoryId)
+      batch.update(storyRef, {
+        status: 'backlog',
+        sprintAttempts: [...(projectStory.sprintAttempts || []), firestoreSprintAttempt],
+        updatedAt: serverTimestamp()
+      })
+      
+      revertedStoryIds.push(sprintStory.originalStoryId)
+      
+      // Track epic impact
+      if (projectStory.epicId) {
+        const current = epicImpacts.get(projectStory.epicId) || { storiesReturned: 0, progressImpact: 0 }
+        current.storiesReturned++
+        epicImpacts.set(projectStory.epicId, current)
+      }
+    }
+    
+    // Process completed stories - add successful sprint attempt
+    for (const sprintStory of completedStories) {
+      const projectStory = await getStory(sprintStory.originalStoryId)
+      if (!projectStory) continue
+      
+      // Create successful sprint attempt record
+      const sprintAttempt: SprintAttempt = {
+        // Sprint Context
+        sprintId: sprint.id,
+        sprintName: sprint.name,
+        sprintGoal: sprint.goal,
+        sprintStartDate: sprint.startDate,
+        sprintEndDate: sprint.endDate,
+        sprintDuration: sprint.duration,
+        
+        // Estimation Context
+        originalStoryPoints: sprintStory.storyPoints,
+        estimationConfidence: 'High',
+        
+        // Progress Tracking
+        statusReached: 'done',
+        progressPercentage: 100,
+        stagesCompleted: sprintStory.statusHistory.map(sh => ({
+          stage: sh.toStatus as 'todo' | 'in_progress' | 'review' | 'testing' | 'done',
+          enteredAt: sh.timestamp,
+          exitedAt: sh.timestamp,
+          timeSpent: 0
+        })),
+        
+        // Assignment History
+        assignments: sprintStory.assignedTo ? [{
+          assignedTo: sprintStory.assignedTo,
+          assignedToName: sprintStory.assignedToName || '',
+          assignedAt: sprintStory.startedAt || sprintStory.addedToSprintAt,
+          unassignedAt: sprintStory.completedAt,
+          reason: 'Completed'
+        }] : [],
+        
+        // Completion Details
+        completionStatus: 'completed',
+        completionReason: 'done',
+        completedAt: sprintStory.completedAt,
+        
+        // Blockers
+        blockersEncountered: sprintStory.blockers.map(b => ({
+          description: b.description,
+          type: b.type,
+          severity: b.severity,
+          reportedAt: b.createdAt,
+          resolvedAt: b.resolvedAt,
+          impactHours: undefined,
+          resolution: b.resolvedAt ? 'Resolved' : undefined
+        })),
+        
+        // Scope Changes
+        scopeChanges: [],
+        
+        // Learning & Insights - Use story-specific notes if available, fall back to global notes
+        retrospectiveNotes: request.storyNotes?.[sprintStory.originalStoryId] || request.retrospectiveNotes,
+        lessonsLearned: request.lessonsLearned,
+        
+        // Metrics
+        cycleTime: sprintStory.completedAt && sprintStory.startedAt 
+          ? (sprintStory.completedAt.getTime() - sprintStory.startedAt.getTime()) / (1000 * 60 * 60)
+          : undefined,
+        leadTime: sprintStory.completedAt 
+          ? (sprintStory.completedAt.getTime() - sprintStory.addedToSprintAt.getTime()) / (1000 * 60 * 60)
+          : undefined,
+        reworkCount: 0,
+        
+        // Metadata
+        attemptNumber: (projectStory.sprintAttempts?.length || 0) + 1,
+        attemptedAt: sprintStory.addedToSprintAt,
+        lastUpdatedAt: new Date()
+      }
+      
+      // Convert sprint attempt for Firestore
+      const firestoreSprintAttempt = convertSprintAttemptForFirestore(sprintAttempt)
+      
+      // Update story in batch: move to completed status and add sprint attempt
+      const storyRef = doc(db, 'stories', sprintStory.originalStoryId)
+      batch.update(storyRef, {
+        status: 'completed',
+        completedAt: serverTimestamp(),
+        sprintAttempts: [...(projectStory.sprintAttempts || []), firestoreSprintAttempt],
+        updatedAt: serverTimestamp()
+      })
+    }
+    
+    // Update sprint status to completed
+    const sprintRef = doc(db, 'sprints', request.sprintId)
+    batch.update(sprintRef, {
+      status: 'completed',
+      metrics: metrics,
+      updatedAt: serverTimestamp()
+    })
+    
+    // Commit all changes atomically
+    await batch.commit()
+    
+    // Update epic counts for affected epics
+    for (const epicId of epicImpacts.keys()) {
+      await updateEpicStoryCounts(epicId)
+    }
+    
+    // Prepare result
+    const result: SprintCompletionResult = {
+      completedStoryIds: completedStories.map(s => s.originalStoryId),
+      incompleteStoryIds: incompleteStories.map(s => s.originalStoryId),
+      revertedToBacklogIds: revertedStoryIds,
+      metrics: metrics,
+      epicImpacts: Array.from(epicImpacts.entries()).map(([epicId, impact]) => ({
+        epicId,
+        storiesReturned: impact.storiesReturned,
+        progressImpact: impact.progressImpact
+      })),
+      nextActions: [
+        ...(incompleteStories.length > 0 ? [`${incompleteStories.length} stories returned to backlog for re-grooming`] : []),
+        ...(request.nextSprintRecommendations || [])
+      ]
+    }
+    
+    return result
+  } catch (error) {
+    console.error('Error completing sprint:', error)
+    throw new Error('Failed to complete sprint')
   }
 }

@@ -4,8 +4,9 @@ import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { getProjectsByOwner } from '@/lib/project-service'
-import { getSprintsByProject, updateSprint } from '@/lib/sprint-service'
+import { getSprintsByProject, updateSprint, completeSprint as completeSprintService } from '@/lib/sprint-service'
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader'
+import { SprintCompletionDialog } from '@/components/sprint/SprintCompletionDialog'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -53,6 +54,8 @@ export default function SprintsPage() {
   const [startingSprints, setStartingSprints] = useState<Set<string>>(new Set())
   const [editingSprintId, setEditingSprintId] = useState<string | null>(null)
   const [editFormData, setEditFormData] = useState({ name: '', description: '', goal: '' })
+  const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
+  const [sprintToComplete, setSprintToComplete] = useState<Sprint | null>(null)
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -184,15 +187,36 @@ export default function SprintsPage() {
     }
   }
 
-  // Complete sprint (change status to completed)
-  const completeSprint = async (sprintId: string) => {
+  // Open completion dialog
+  const openCompletionDialog = (sprint: Sprint) => {
+    setSprintToComplete(sprint)
+    setCompletionDialogOpen(true)
+  }
+
+  // Complete sprint with retrospective notes
+  const completeSprint = async (retrospectiveNotes: string, storyNotes: Record<string, string>, lessonsLearned: string[]) => {
+    if (!sprintToComplete || !user) return
+    
     try {
-      await updateSprint(sprintId, { status: 'completed' })
+      // Call the new completion service
+      await completeSprintService({
+        sprintId: sprintToComplete.id,
+        completionReason: 'manual',
+        retrospectiveNotes,
+        storyNotes,
+        lessonsLearned,
+        nextSprintRecommendations: []
+      })
+      
       // Reload sprints to get updated data
       if (selectedProject) {
         const projectSprints = await getSprintsByProject(selectedProject)
         setSprints(projectSprints)
       }
+      
+      // Close dialog
+      setCompletionDialogOpen(false)
+      setSprintToComplete(null)
     } catch (error) {
       console.error('Error completing sprint:', error)
     }
@@ -524,7 +548,7 @@ export default function SprintsPage() {
                             )}
                             {sprint.status === 'active' && (
                               <>
-                                <DropdownMenuItem onClick={() => completeSprint(sprint.id)}>
+                                <DropdownMenuItem onClick={() => openCompletionDialog(sprint)}>
                                   <CheckCircle2 className="mr-2 h-4 w-4" />
                                   Complete Sprint
                                 </DropdownMenuItem>
@@ -696,6 +720,17 @@ export default function SprintsPage() {
           </div>
         </div>
       )}
+
+      {/* Sprint Completion Dialog */}
+      <SprintCompletionDialog
+        isOpen={completionDialogOpen}
+        onClose={() => {
+          setCompletionDialogOpen(false)
+          setSprintToComplete(null)
+        }}
+        sprint={sprintToComplete}
+        onComplete={completeSprint}
+      />
     </div>
   )
 }

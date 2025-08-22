@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { StorySprintHistory } from "@/components/story/StorySprintHistory"
 import { 
   Edit, 
   Calendar, 
@@ -112,6 +113,7 @@ export function StoryDetailModal({ story, isOpen, onClose, onEdit, onStoryUpdate
       case 'backlog': return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
       case 'planning': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
       case 'sprint_ready': return 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300'
+      case 'completed': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300'
       default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
     }
   }
@@ -424,6 +426,13 @@ export function StoryDetailModal({ story, isOpen, onClose, onEdit, onStoryUpdate
                 </div>
               )}
             </div>
+
+            {/* Sprint History Section - Full Width */}
+            {story.sprintAttempts && story.sprintAttempts.length > 0 && (
+              <div className="mt-6">
+                <StorySprintHistory sprintAttempts={story.sprintAttempts} />
+              </div>
+            )}
 
           </div>
         </div>

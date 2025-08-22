@@ -328,3 +328,44 @@ export interface SprintBoardState {
   activities: SprintActivity[]
   connectionStatus: 'connected' | 'connecting' | 'disconnected' | 'error'
 }
+
+// Sprint Completion Types
+export interface CompleteSprintRequest {
+  sprintId: string
+  completionReason: 'manual' | 'expired'
+  retrospectiveNotes?: string
+  storyNotes?: Record<string, string> // storyId -> story-specific retrospective notes
+  nextSprintRecommendations?: string[]
+  lessonsLearned?: string[]
+  teamFeedback?: Record<string, string> // userId -> feedback
+}
+
+export interface SprintCompletionResult {
+  completedStoryIds: string[]
+  incompleteStoryIds: string[]
+  revertedToBacklogIds: string[]
+  metrics: SprintMetrics
+  epicImpacts: Array<{
+    epicId: string
+    storiesReturned: number
+    progressImpact: number // percentage change
+  }>
+  nextActions: string[]
+}
+
+export interface StoryReversionDetails {
+  storyId: string
+  originalStoryId: string
+  title: string
+  epicId?: string
+  statusBefore: 'sprint_ready'
+  statusAfter: 'backlog'
+  progressReached: number
+  stageReached: 'todo' | 'in_progress' | 'review' | 'testing'
+  blockersEncountered: SprintBlocker[]
+  timeSpentHours: number
+  assignmentHistory: Array<{
+    assignedTo: string
+    duration: number
+  }>
+}

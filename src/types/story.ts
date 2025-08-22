@@ -102,8 +102,8 @@ export interface Story {
   blockedByIds: string[]
   relatedStoryIds: string[]
   
-  // Status & Workflow - Simplified for story preparation workflow
-  status: 'backlog' | 'planning' | 'sprint_ready'
+  // Status & Workflow - Complete story lifecycle
+  status: 'backlog' | 'planning' | 'sprint_ready' | 'completed'
   workflowStatus?: string
   blockers: Blocker[]
   
@@ -146,6 +146,9 @@ export interface Story {
   
   // Template Info
   createdFromTemplate?: string
+  
+  // Sprint History Tracking
+  sprintAttempts?: SprintAttempt[] // Optional to maintain backward compatibility
 }
 
 export interface AcceptanceCriterion {
@@ -185,6 +188,88 @@ export interface Attachment {
   uploadedBy: string
   uploadedAt: Date
   size?: number
+}
+
+// Sprint Attempt History for Stories
+export interface SprintAttempt {
+  // Sprint Context
+  sprintId: string
+  sprintName: string
+  sprintGoal: string
+  sprintStartDate: Date
+  sprintEndDate: Date
+  sprintDuration: number // days
+  
+  // Estimation & Planning Context
+  estimationSessionId?: string
+  originalStoryPoints?: number
+  adjustedStoryPoints?: number // if re-estimated during sprint
+  estimationConfidence: 'Low' | 'Medium' | 'High'
+  estimationParticipants?: string[]
+  
+  // Progress Tracking
+  statusReached: 'todo' | 'in_progress' | 'review' | 'testing' | 'done'
+  progressPercentage: number // 0-100
+  stagesCompleted: Array<{
+    stage: 'todo' | 'in_progress' | 'review' | 'testing' | 'done'
+    enteredAt: Date
+    exitedAt?: Date
+    timeSpent: number // hours
+  }>
+  
+  // Assignment History
+  assignments: Array<{
+    assignedTo: string
+    assignedToName: string
+    assignedAt: Date
+    unassignedAt?: Date
+    reason?: string
+  }>
+  
+  // Completion Details
+  completionStatus: 'completed' | 'incomplete' | 'carried_over'
+  completionReason?: 'done' | 'sprint_ended' | 'removed' | 'descoped' | 'blocked'
+  completedAt?: Date
+  incompleteReason?: string
+  
+  // Blockers & Issues
+  blockersEncountered: Array<{
+    description: string
+    type: 'technical' | 'dependency' | 'resource' | 'external'
+    severity: 'low' | 'medium' | 'high' | 'critical'
+    reportedAt: Date
+    resolvedAt?: Date
+    impactHours?: number
+    resolution?: string
+  }>
+  
+  // Scope Changes
+  scopeChanges: Array<{
+    changeType: 'added' | 'modified' | 'removed'
+    description: string
+    changedAt: Date
+    changedBy: string
+    reason: string
+  }>
+  
+  // Learning & Insights
+  complexityInsights?: string // Notes about actual vs estimated complexity
+  velocityImpact?: number // How this story affected sprint velocity
+  teamFeedback?: string[]
+  retrospectiveNotes?: string
+  lessonsLearned?: string[]
+  
+  // Metrics
+  cycleTime?: number // hours from start to done
+  leadTime?: number // hours from todo to done
+  touchTime?: number // actual hours worked
+  waitTime?: number // hours waiting/blocked
+  reworkCount: number // times moved backward in workflow
+  
+  // Sprint Attempt Metadata
+  attemptNumber: number // 1st attempt, 2nd attempt, etc.
+  attemptedAt: Date // When story was added to sprint
+  lastUpdatedAt: Date
 }
 
 export interface Epic {
