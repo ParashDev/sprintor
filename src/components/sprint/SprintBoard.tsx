@@ -21,7 +21,8 @@ import {
 } from '@dnd-kit/sortable'
 import { restrictToWindowEdges } from '@dnd-kit/modifiers'
 import type { Sprint, SprintStory, SprintParticipant } from '@/types/sprint'
-import { updateSprint, subscribeToSprint } from '@/lib/sprint-service'
+import { updateSprint, subscribeToSprint, completeSprint } from '@/lib/sprint-service'
+import { SprintCompletionDialog } from './SprintCompletionDialog'
 import { SprintColumn } from './SprintColumn'
 import { SprintCard } from './SprintCard'
 import { SprintHeader } from './SprintHeader'
@@ -48,6 +49,8 @@ export function SprintBoard({
   const [localSprint, setLocalSprint] = useState(sprint)
   const [activeStory, setActiveStory] = useState<SprintStory | null>(null)
   const [showAddStoryModal, setShowAddStoryModal] = useState(false)
+  const [showCompletionDialog, setShowCompletionDialog] = useState(false)
+  const [isStartingSprint, setIsStartingSprint] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [isLocalUpdate, setIsLocalUpdate] = useState(false)
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
@@ -252,6 +255,72 @@ export function SprintBoard({
     }
   }
 
+  // Handle starting the sprint
+  const handleStartSprint = async () => {
+    if (isStartingSprint || accessLevel !== 'admin') return
+    
+    try {
+      setIsStartingSprint(true)
+      await updateSprint(currentSprint.id, {
+        status: 'active'
+      })
+      
+      // Update local state to show active status immediately
+      setLocalSprint(prev => ({
+        ...prev,
+        status: 'active',
+        startDate: new Date()
+      }))
+    } catch (error) {
+      console.error('Error starting sprint:', error)
+    } finally {
+      setIsStartingSprint(false)
+    }
+  }
+
+  // Handle ending/completing the sprint
+  const handleEndSprint = () => {
+    if (accessLevel !== 'admin') return
+    setShowCompletionDialog(true)
+  }
+
+  // Handle sprint completion
+  const handleSprintCompletion = async (
+    retrospectiveNotes: string,
+    storyNotes: Record<string, string>,
+    lessonsLearned: string[]
+  ) => {
+    try {
+      await completeSprint({
+        sprintId: currentSprint.id,
+        completionReason: 'manual',
+        retrospectiveNotes,
+        storyNotes,
+        lessonsLearned
+      })
+            
+      // Update local state to show completed status
+      setLocalSprint(prev => ({
+        ...prev,
+        status: 'completed',
+        completedAt: new Date()
+      }))
+      
+      setShowCompletionDialog(false)
+      
+      // Optionally trigger parent update or navigation
+      if (onSprintUpdate) {
+        onSprintUpdate({
+          ...currentSprint,
+          status: 'completed',
+          completedAt: new Date()
+        })
+      }
+    } catch (error) {
+      console.error('Error completing sprint:', error)
+    }
+  }
+
   return (
     <div className="h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
       {/* Sprint Header */}
@@ -260,7 +329,10 @@ export function SprintBoard({
         accessLevel={accessLevel}
         participants={participants}
         onAddStory={() => setShowAddStoryModal(true)}
+        onStartSprint={handleStartSprint}
+        onEndSprint={handleEndSprint}
         onLeave={onLeave}
+        isStartingSprint={isStartingSprint}
       />
 
       {/* Sprint Board */}
@@ -365,6 +437,16 @@ export function SprintBoard({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Sprint Completion Dialog */}
+      {showCompletionDialog && (
+        <SprintCompletionDialog
+          isOpen={showCompletionDialog}
+          onClose={() => setShowCompletionDialog(false)}
+          sprint={currentSprint}
+          onComplete={handleSprintCompletion}
+        />
       )}
     </div>
   )

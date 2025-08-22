@@ -25,6 +25,7 @@ export interface Sprint {
   
   // Status & Lifecycle  
   status: 'draft' | 'active' | 'completed' | 'cancelled'
+  completedAt?: Date          // When sprint was completed (only for completed sprints)
   
   // Story Management
   stories: SprintStory[]
@@ -236,12 +237,13 @@ export interface SprintActivity {
 }
 
 // Firestore Document Types (for proper timestamp handling)
-export interface FirestoreSprint extends Omit<Sprint, 'createdAt' | 'updatedAt' | 'lastActivity' | 'startDate' | 'endDate' | 'stories' | 'burndownData' | 'members' | 'participants'> {
+export interface FirestoreSprint extends Omit<Sprint, 'createdAt' | 'updatedAt' | 'lastActivity' | 'startDate' | 'endDate' | 'completedAt' | 'stories' | 'burndownData' | 'members' | 'participants'> {
   createdAt: { toDate(): Date } | Date
   updatedAt: { toDate(): Date } | Date
   lastActivity: { toDate(): Date } | Date
   startDate: { toDate(): Date } | Date
   endDate: { toDate(): Date } | Date
+  completedAt?: { toDate(): Date } | Date
   stories: FirestoreSprintStory[]
   burndownData: FirestoreBurndownPoint[]
   members: FirestoreSprintMember[]

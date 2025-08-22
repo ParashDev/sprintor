@@ -24,6 +24,7 @@ interface SprintHeaderProps {
   onStartSprint?: () => void
   onEndSprint?: () => void
   onLeave?: () => void
+  isStartingSprint?: boolean
 }
 
 export function SprintHeader({
@@ -33,7 +34,8 @@ export function SprintHeader({
   onAddStory,
   onStartSprint,
   onEndSprint,
-  onLeave
+  onLeave,
+  isStartingSprint = false
 }: SprintHeaderProps) {
   const [showStats, setShowStats] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
@@ -142,17 +144,22 @@ export function SprintHeader({
               {accessLevel === 'admin' && sprint.status === 'draft' && (
                 <button
                   onClick={onStartSprint}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded font-medium transition-colors"
+                  disabled={isStartingSprint}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-700 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
                 >
-                  <Play className="w-4 h-4" />
-                  Start Sprint
+                  {isStartingSprint ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+                  ) : (
+                    <Play className="w-4 h-4" />
+                  )}
+                  {isStartingSprint ? 'Starting...' : 'Start Sprint'}
                 </button>
               )}
               
               {accessLevel === 'admin' && sprint.status === 'active' && (
                 <button
                   onClick={onEndSprint}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-gray-100 text-white dark:text-gray-900 rounded font-medium transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded font-medium transition-colors shadow-sm hover:shadow-md"
                 >
                   <Square className="w-4 h-4" />
                   End Sprint
@@ -162,7 +169,7 @@ export function SprintHeader({
               {accessLevel !== 'view' && (
                 <button
                   onClick={onAddStory}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded font-medium transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 hover:border-gray-400 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded font-medium transition-colors"
                 >
                   <Plus className="w-4 h-4" />
                   Add Story
@@ -171,7 +178,7 @@ export function SprintHeader({
               
               <button
                 onClick={() => setShowStats(!showStats)}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded font-medium transition-colors"
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 hover:border-gray-400 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded font-medium transition-colors"
               >
                 Details
                 {showStats ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -179,7 +186,7 @@ export function SprintHeader({
               
               <button
                 onClick={handleCopyLink}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded font-medium transition-colors"
+                className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 hover:border-gray-400 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded font-medium transition-colors"
                 title="Copy sprint link"
               >
                 {linkCopied ? <Check className="w-4 h-4 text-green-600" /> : <Share className="w-4 h-4" />}
@@ -222,17 +229,22 @@ export function SprintHeader({
               {accessLevel === 'admin' && sprint.status === 'draft' && (
                 <button
                   onClick={onStartSprint}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded font-medium"
+                  disabled={isStartingSprint}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
                 >
-                  <Play className="w-4 h-4" />
-                  Start Sprint
+                  {isStartingSprint ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+                  ) : (
+                    <Play className="w-4 h-4" />
+                  )}
+                  {isStartingSprint ? 'Starting...' : 'Start Sprint'}
                 </button>
               )}
               
               {accessLevel === 'admin' && sprint.status === 'active' && (
                 <button
                   onClick={onEndSprint}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded font-medium"
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded font-medium transition-colors shadow-sm hover:shadow-md"
                 >
                   <Square className="w-4 h-4" />
                   End Sprint

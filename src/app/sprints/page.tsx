@@ -510,22 +510,26 @@ export default function SprintsPage() {
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copySprintLink(sprint.id)}
-                          title="Copy sprint link"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => router.push(`/sprint/${sprint.id}`)}
-                          title="Open sprint"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </Button>
+                        {sprint.status !== 'completed' && sprint.status !== 'cancelled' && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => copySprintLink(sprint.id)}
+                              title="Copy sprint link"
+                            >
+                              <Copy className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => router.push(`/sprint/${sprint.id}`)}
+                              title="Open sprint"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm" title="More actions">

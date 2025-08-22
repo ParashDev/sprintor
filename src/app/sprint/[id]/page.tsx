@@ -181,6 +181,46 @@ export default function SprintPage() {
     )
   }
 
+  // Check if sprint is completed or cancelled
+  if (sprint.status === 'completed' || sprint.status === 'cancelled') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className={`${sprint.status === 'completed' ? 'bg-green-100 dark:bg-green-900/30' : 'bg-gray-100 dark:bg-gray-900/30'} rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4`}>
+            {sprint.status === 'completed' ? (
+              <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg className="w-8 h-8 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+          </div>
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
+            Sprint Has {sprint.status === 'completed' ? 'Ended' : 'Been Cancelled'}
+          </h2>
+          <p className="text-slate-600 dark:text-slate-400 mb-2 font-medium">
+            {sprint.name}
+          </p>
+          <p className="text-slate-600 dark:text-slate-400 mb-6">
+            This sprint is no longer active and cannot be accessed. 
+            {sprint.status === 'completed' 
+              ? ' All stories have been processed and the sprint board is archived.' 
+              : ' The sprint was cancelled before completion.'
+            }
+          </p>
+          <button
+            onClick={() => router.push('/')}
+            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            Back to Home
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // Render the main sprint board
   return (
     <SprintBoard
