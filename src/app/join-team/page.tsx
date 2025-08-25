@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -8,7 +8,7 @@ import { Users, Loader2, CheckCircle } from 'lucide-react'
 import { getTeamByInviteCode, addTeamMember, type Team } from '@/lib/team-service'
 import { toast } from 'sonner'
 
-export default function JoinTeamPage() {
+function JoinTeamContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const [team, setTeam] = useState<Team | null>(null)
@@ -223,5 +223,24 @@ export default function JoinTeamPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function JoinTeamPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+            <p className="text-center text-muted-foreground mt-4">Loading...</p>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <JoinTeamContent />
+    </Suspense>
   )
 }
