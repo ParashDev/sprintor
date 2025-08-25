@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { CreateProjectModal } from "@/components/CreateProjectModal"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
   Plus, 
   Users, 
@@ -19,7 +18,6 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader"
-import { TeamsTab } from "@/components/projects/TeamsTab"
 import { toast } from "sonner"
 import { createProject, subscribeToUserProjects, syncProjectSprintCounts, getActiveSprintsCount, type Project } from "@/lib/project-service"
 
@@ -174,99 +172,84 @@ export default function ProjectsPage() {
           </Card>
         </div>
 
-        {/* Tabs Section */}
-        <Tabs defaultValue="projects" className="space-y-4">
-          <div className="flex justify-center">
-            <TabsList className="h-12 p-1 text-base">
-              <TabsTrigger value="projects" className="px-6 py-2">Projects</TabsTrigger>
-              <TabsTrigger value="teams" className="px-6 py-2">Teams</TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="projects" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div>
-                    <CardTitle>Your Projects</CardTitle>
-                    <CardDescription>
-                      Manage your planning poker projects and settings
-                    </CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {loadingProjects ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : projects.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <Briefcase className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium mb-1">No projects yet</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Create your first project to start organizing planning sessions
-                    </p>
-                    <Button onClick={() => setShowCreateModal(true)}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create First Project
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {projects.map((project) => (
-                      <Card key={project.id} className="hover:shadow-md transition-shadow">
-                        <CardHeader>
-                          <div className="flex items-start justify-between">
-                            <div className="space-y-1">
-                              <CardTitle className="text-lg">{project.name}</CardTitle>
-                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                <Building className="h-3 w-3" />
-                                <span>{project.companyName}</span>
-                              </div>
-                            </div>
-                            <Badge variant="outline" className="text-xs">
-                              {project.sprintsCount} {project.sprintsCount === 1 ? 'sprint' : 'sprints'}
-                            </Badge>
+        {/* Projects Section */}
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <CardTitle>Your Projects</CardTitle>
+                <CardDescription>
+                  Manage your planning poker projects and settings
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loadingProjects ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : projects.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Briefcase className="h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-1">No projects yet</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Create your first project to start organizing planning sessions
+                </p>
+                <Button onClick={() => setShowCreateModal(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create First Project
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {projects.map((project) => (
+                  <Card key={project.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <CardTitle className="text-lg">{project.name}</CardTitle>
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Building className="h-3 w-3" />
+                            <span>{project.companyName}</span>
                           </div>
-                        </CardHeader>
-                        
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                            {project.description || "No description provided"}
-                          </p>
-                          
-                          <div className="flex items-center justify-between text-xs text-muted-foreground mb-4">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              <span>Created {project.createdAt.toLocaleDateString()}</span>
-                            </div>
-                          </div>
-                          
-                          <div className="flex gap-2">
-                            <Button size="sm" className="flex-1" asChild>
-                              <Link href={`/planning?project=${project.id}`}>
-                                <Calendar className="h-4 w-4 mr-1" />
-                                Planning
-                              </Link>
-                            </Button>
-                            <Button size="sm" variant="outline">
-                              <Settings className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="teams" className="space-y-4">
-            <TeamsTab />
-          </TabsContent>
-        </Tabs>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {project.sprintsCount} {project.sprintsCount === 1 ? 'sprint' : 'sprints'}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                        {project.description || "No description provided"}
+                      </p>
+                      
+                      <div className="flex items-center justify-between text-xs text-muted-foreground mb-4">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          <span>Created {project.createdAt.toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button size="sm" className="flex-1" asChild>
+                          <Link href={`/planning?project=${project.id}`}>
+                            <Calendar className="h-4 w-4 mr-1" />
+                            Planning
+                          </Link>
+                        </Button>
+                        <Button size="sm" variant="outline">
+                          <Settings className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </main>
 
       <CreateProjectModal 

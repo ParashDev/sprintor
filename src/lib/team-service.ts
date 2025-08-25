@@ -336,3 +336,28 @@ export async function updateMemberRole(teamId: string, memberId: string, newRole
     throw new Error('Failed to update member role')
   }
 }
+
+// Subscribe to teams by project ID
+export function subscribeToTeamsByProject(projectId: string, userId: string, callback: (teams: Team[]) => void): () => void {
+  const teamsQuery = query(
+    collection(db, 'teams'),
+    where('projectId', '==', projectId),
+    where('ownerId', '==', userId),
+    orderBy('createdAt', 'desc')
+  )
+  
+  const unsubscribe = onSnapshot(teamsQuery, (snapshot) => {
+    const teams: Team[] = []
+    
+    snapshot.forEach((doc) => {
+      const data = doc.data() as FirestoreTeam
+      teams.push(convertFirestoreTeam(data))
+    })
+    
+    callback(teams)
+  }, (error) => {
+    console.error('Error in teams by project subscription:', error)
+  })
+  
+  return unsubscribe
+}

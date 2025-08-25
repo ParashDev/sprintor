@@ -92,6 +92,16 @@ export function DashboardHeader() {
                 Projects
               </Link>
               <Link 
+                href="/teams" 
+                className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
+                  isActiveLink('/teams') 
+                    ? 'border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground' 
+                    : 'text-muted-foreground hover:text-primary'
+                }`}
+              >
+                Teams
+              </Link>
+              <Link 
                 href="/epics" 
                 className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
                   isActiveLink('/epics') 
@@ -247,6 +257,17 @@ export function DashboardHeader() {
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Projects
+                  </Link>
+                  <Link
+                    href="/teams"
+                    className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                      isActiveLink('/teams')
+                        ? 'border border-border/50 bg-background/50 hover:bg-accent hover:text-accent-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                    }`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Teams
                   </Link>
                   <Link
                     href="/epics"

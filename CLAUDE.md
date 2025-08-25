@@ -76,6 +76,18 @@ npm run lint            # Run ESLint checks (required to pass before deployment)
 - ✅ **Search & Filtering**: Real-time story search with instant results
 - ✅ **Story Statistics**: Live stats cards showing project progress and completion rates
 
+### 👥 Team Management System (COMPLETED)
+- ✅ **Project-Specific Teams**: Teams are now assigned to specific projects (not global)
+- ✅ **Team Creation**: Comprehensive team creation with mandatory project selection
+- ✅ **Agile Roles**: Product Owner, Scrum Master, Business Analyst, Developer, Tester, Stakeholder
+- ✅ **Team Invitations**: Shareable invite links with auto-generated codes
+- ✅ **Invite Control**: Team owners can enable/disable invite links for security
+- ✅ **Member Management**: Role editing, member removal by team owners only
+- ✅ **Team Settings**: Edit team details, change project assignment, delete teams
+- ✅ **Real-time Updates**: Live team member list updates via Firestore subscriptions
+- ✅ **Consistent UI**: All modals follow unified design with fixed headers and scroll locking
+- ✅ **Join Flow**: Public join page at `/join-team?code=XXXXX` with team validation
+
 ### Core Session Management
 - ✅ **Session Creation**: Hosts can create sessions with custom names, descriptions, and estimation decks
 - ✅ **Session Joining**: Participants join via 6-character room codes
