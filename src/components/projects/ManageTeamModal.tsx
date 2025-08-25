@@ -281,7 +281,7 @@ export function ManageTeamModal({ isOpen, onClose, team, currentUserId, onTeamUp
                 Update Member Role
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Change {editingMember.name}'s role in the team
+                Change {editingMember.name}&apos;s role in the team
               </p>
             </div>
             

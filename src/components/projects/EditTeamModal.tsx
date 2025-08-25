@@ -295,7 +295,7 @@ export function EditTeamModal({ isOpen, onClose, team, onTeamUpdated, onTeamDele
                         </h3>
                         <div className="mt-2 text-sm text-red-700 dark:text-red-300">
                           <p>
-                            Are you sure you want to delete <strong>"{team.name}"</strong>? This action cannot be undone.
+                            Are you sure you want to delete <strong>&ldquo;{team.name}&ldquo;</strong>? This action cannot be undone.
                           </p>
                           <ul className="mt-2 list-disc list-inside space-y-1">
                             <li>All team members will be removed</li>

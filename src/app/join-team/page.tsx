@@ -136,7 +136,7 @@ export default function JoinTeamPage() {
             <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Welcome to {team?.name}!</h2>
             <p className="text-muted-foreground mb-4">
-              You've successfully joined the team as a {team?.defaultRole?.replace('_', ' ')}.
+              You&apos;ve successfully joined the team as a {team?.defaultRole?.replace('_', ' ')}.
             </p>
             <p className="text-sm text-muted-foreground">
               Redirecting to projects page...
@@ -158,7 +158,7 @@ export default function JoinTeamPage() {
           </div>
           <CardTitle className="text-center">Join Team</CardTitle>
           <CardDescription className="text-center">
-            You've been invited to join <strong>{team?.name}</strong>
+            You&apos;ve been invited to join <strong>{team?.name}</strong>
           </CardDescription>
         </CardHeader>
         

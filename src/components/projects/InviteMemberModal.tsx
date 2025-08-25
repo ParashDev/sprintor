@@ -161,7 +161,7 @@ export function InviteMemberModal({ isOpen, onClose, team }: InviteMemberModalPr
               <li>1. Copy the invite code or link above</li>
               <li>2. Share it with team members via email, Slack, etc.</li>
               <li>3. Members can join by entering the code or clicking the link</li>
-              <li>4. All new members will get '{formatRoleName(team.defaultRole || 'developer')}' role by default</li>
+              <li>4. All new members will get &apos;{formatRoleName(team.defaultRole || 'developer')}&apos; role by default</li>
             </ol>
           </div>
 
@@ -175,7 +175,7 @@ export function InviteMemberModal({ isOpen, onClose, team }: InviteMemberModalPr
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              All members joining with this invite code will get '{formatRoleName(team.defaultRole || 'developer')}' role. You can change individual member roles later from team settings.
+              All members joining with this invite code will get &apos;{formatRoleName(team.defaultRole || 'developer')}&apos; role. You can change individual member roles later from team settings.
             </p>
           </div>
 
