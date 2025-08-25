@@ -10,7 +10,8 @@ import {
   collection,
   where,
   orderBy,
-  getDocs
+  getDocs,
+  writeBatch
 } from 'firebase/firestore'
 import { db } from './firebase'
 
@@ -25,7 +26,7 @@ export interface Project {
   createdAt: Date
   updatedAt: Date
   ownerId: string
-  sessionsCount: number
+  sprintsCount: number
 }
 
 // Firestore document types for proper timestamp handling
@@ -40,7 +41,7 @@ interface FirestoreProject {
   createdAt: { toDate(): Date } | Date
   updatedAt: { toDate(): Date } | Date
   ownerId: string
-  sessionsCount: number
+  sprintsCount: number
 }
 
 // Helper function to convert Firestore project to our Project type
@@ -77,7 +78,7 @@ export async function createProject(projectData: {
       ...projectData,
       createdAt: new Date(),
       updatedAt: new Date(),
-      sessionsCount: 0
+      sprintsCount: 0
     }
 
     await setDoc(doc(db, 'projects', projectId), {
@@ -185,21 +186,83 @@ export function subscribeToUserProjects(ownerId: string, callback: (projects: Pr
   return unsubscribe
 }
 
-// Increment session count for a project
-export async function incrementProjectSessionCount(projectId: string): Promise<void> {
+// Increment sprint count for a project
+export async function incrementProjectSprintCount(projectId: string): Promise<void> {
   try {
     const docRef = doc(db, 'projects', projectId)
     const docSnap = await getDoc(docRef)
     
     if (docSnap.exists()) {
-      const currentCount = docSnap.data().sessionsCount || 0
+      const currentCount = docSnap.data().sprintsCount || 0
       await updateDoc(docRef, {
-        sessionsCount: currentCount + 1,
+        sprintsCount: currentCount + 1,
         updatedAt: serverTimestamp()
       })
     }
   } catch (error) {
-    console.error('Error incrementing session count:', error)
-    throw new Error('Failed to update session count')
+    console.error('Error incrementing sprint count:', error)
+    throw new Error('Failed to update sprint count')
+  }
+}
+
+// Get actual sprint count for a project from the sprints collection
+export async function getActualProjectSprintCount(projectId: string): Promise<number> {
+  try {
+    const sprintsQuery = query(
+      collection(db, 'sprints'),
+      where('projectId', '==', projectId)
+    )
+    const snapshot = await getDocs(sprintsQuery)
+    return snapshot.size
+  } catch (error) {
+    console.error('Error getting actual sprint count:', error)
+    return 0
+  }
+}
+
+// Get active sprint count across all user projects
+export async function getActiveSprintsCount(ownerId: string): Promise<number> {
+  try {
+    // First get all projects for this user
+    const projects = await getProjectsByOwner(ownerId)
+    const projectIds = projects.map(p => p.id)
+    
+    if (projectIds.length === 0) return 0
+    
+    // Query sprints that belong to user's projects and are active
+    const sprintsQuery = query(
+      collection(db, 'sprints'),
+      where('projectId', 'in', projectIds),
+      where('status', '==', 'active')
+    )
+    const snapshot = await getDocs(sprintsQuery)
+    return snapshot.size
+  } catch (error) {
+    console.error('Error getting active sprints count:', error)
+    return 0
+  }
+}
+
+// Sync project sprint counts with actual data from sprints collection
+export async function syncProjectSprintCounts(ownerId: string): Promise<void> {
+  try {
+    const projects = await getProjectsByOwner(ownerId)
+    const batch = writeBatch(db)
+    
+    for (const project of projects) {
+      const actualCount = await getActualProjectSprintCount(project.id)
+      if (project.sprintsCount !== actualCount) {
+        const projectRef = doc(db, 'projects', project.id)
+        batch.update(projectRef, {
+          sprintsCount: actualCount,
+          updatedAt: serverTimestamp()
+        })
+      }
+    }
+    
+    await batch.commit()
+  } catch (error) {
+    console.error('Error syncing project sprint counts:', error)
+    throw new Error('Failed to sync sprint counts')
   }
 }

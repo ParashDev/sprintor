@@ -39,6 +39,7 @@ import type {
 import type { Story, SprintAttempt } from '@/types/story'
 import { getStoriesByProject, getStory, updateStory } from './story-service'
 import { updateEpicStoryCounts } from './epic-service'
+import { incrementProjectSprintCount } from './project-service'
 // === UTILITY FUNCTIONS ===
 
 // Generate unique IDs
@@ -240,6 +241,9 @@ export async function createSprint(sprintData: CreateSprintRequest): Promise<str
     })
     
     await setDoc(doc(db, 'sprints', sprintId), cleanData)
+    
+    // Increment the project's sprint count
+    await incrementProjectSprintCount(sprintData.projectId)
     
     return sprintId
   } catch (error) {

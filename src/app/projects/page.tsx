@@ -19,15 +19,17 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader"
+import { TeamsTab } from "@/components/projects/TeamsTab"
 import { toast } from "sonner"
-import { createProject, subscribeToUserProjects, type Project } from "@/lib/project-service"
+import { createProject, subscribeToUserProjects, syncProjectSprintCounts, getActiveSprintsCount, type Project } from "@/lib/project-service"
 
 export default function ProjectsPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const [projects, setProjects] = useState<Project[]>([])
   const [loadingProjects, setLoadingProjects] = useState(true)
-  const [showCreateModal, setShowCreateModal] = useState(false)  
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [activeSprintsCount, setActiveSprintsCount] = useState(0)  
 
   useEffect(() => {
     // Redirect to login if not authenticated
@@ -40,9 +42,23 @@ export default function ProjectsPage() {
     // Subscribe to projects when user is available
     if (user && !loading) {
       setLoadingProjects(true)
-      const unsubscribe = subscribeToUserProjects(user.uid, (projects) => {
+      
+      // Sync project sprint counts first
+      syncProjectSprintCounts(user.uid).catch(error => 
+        console.error('Failed to sync sprint counts:', error)
+      )
+      
+      const unsubscribe = subscribeToUserProjects(user.uid, async (projects) => {
         setProjects(projects)
         setLoadingProjects(false)
+        
+        // Load active sprints count
+        try {
+          const activeCount = await getActiveSprintsCount(user.uid)
+          setActiveSprintsCount(activeCount)
+        } catch (error) {
+          console.error('Failed to get active sprints count:', error)
+        }
       })
 
       return unsubscribe
@@ -122,13 +138,13 @@ export default function ProjectsPage() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Sessions</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Sprints</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{projects.reduce((sum, p) => sum + p.sessionsCount, 0)}</div>
+              <div className="text-2xl font-bold">{projects.reduce((sum, p) => sum + p.sprintsCount, 0)}</div>
               <p className="text-xs text-muted-foreground">
-                {projects.length === 0 ? "Create your first project" : "Planning sessions"}
+                {projects.length === 0 ? "Create your first project" : "Total sprints created"}
               </p>
             </CardContent>
           </Card>
@@ -146,13 +162,13 @@ export default function ProjectsPage() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Latest Activity</CardTitle>
+              <CardTitle className="text-sm font-medium">Active Sprints</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">--</div>
+              <div className="text-2xl font-bold">{activeSprintsCount}</div>
               <p className="text-xs text-muted-foreground">
-                {projects.length === 0 ? "No activity yet" : "Days since update"}
+                {activeSprintsCount === 0 ? "No active sprints" : "Currently running"}
               </p>
             </CardContent>
           </Card>
@@ -164,7 +180,6 @@ export default function ProjectsPage() {
             <TabsList className="h-12 p-1 text-base">
               <TabsTrigger value="projects" className="px-6 py-2">Projects</TabsTrigger>
               <TabsTrigger value="teams" className="px-6 py-2">Teams</TabsTrigger>
-              <TabsTrigger value="integrations" className="px-6 py-2">Integrations</TabsTrigger>
             </TabsList>
           </div>
 
@@ -211,7 +226,7 @@ export default function ProjectsPage() {
                               </div>
                             </div>
                             <Badge variant="outline" className="text-xs">
-                              {project.sessionsCount} sessions
+                              {project.sprintsCount} {project.sprintsCount === 1 ? 'sprint' : 'sprints'}
                             </Badge>
                           </div>
                         </CardHeader>
@@ -249,159 +264,7 @@ export default function ProjectsPage() {
           </TabsContent>
 
           <TabsContent value="teams" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Team Management</CardTitle>
-                <CardDescription>
-                  Manage team members, roles, and project access across your organization
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {/* Team Members Section */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-medium">Team Members</h4>
-                      <Button size="sm" variant="outline">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Invite Member
-                      </Button>
-                    </div>
-                    <div className="border rounded-lg p-4">
-                      <div className="flex flex-col items-center justify-center py-8 text-center">
-                        <Users className="h-12 w-12 text-muted-foreground mb-4" />
-                        <h3 className="text-lg font-medium mb-1">No team members yet</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Invite team members to collaborate on planning sessions
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Roles & Permissions */}
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-medium">Default Roles & Permissions</h4>
-                    <div className="grid gap-4 md:grid-cols-3">
-                      <div className="border rounded-lg p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="h-2 w-2 rounded-full bg-blue-500"></div>
-                          <span className="text-sm font-medium">Product Owner</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">Create projects, manage backlog, facilitate sessions</p>
-                      </div>
-                      <div className="border rounded-lg p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                          <span className="text-sm font-medium">Scrum Master</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">Facilitate planning sessions, view analytics</p>
-                      </div>
-                      <div className="border rounded-lg p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="h-2 w-2 rounded-full bg-orange-500"></div>
-                          <span className="text-sm font-medium">Developer</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground">Participate in estimation sessions, vote on stories</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="integrations" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Project Integrations</CardTitle>
-                <CardDescription>
-                  Connect with your existing tools to streamline your agile workflow
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {/* Popular Integrations */}
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-medium">Popular Integrations</h4>
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="border rounded-lg p-4 hover:bg-accent/50 transition-colors">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center">
-                              <span className="text-xs font-bold text-blue-600 dark:text-blue-400">J</span>
-                            </div>
-                            <div>
-                              <span className="text-sm font-medium">Jira Integration</span>
-                              <p className="text-xs text-muted-foreground">Import stories, sync estimates</p>
-                            </div>
-                          </div>
-                          <Button size="sm" variant="outline">Connect</Button>
-                        </div>
-                      </div>
-                      <div className="border rounded-lg p-4 hover:bg-accent/50 transition-colors">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded bg-purple-100 dark:bg-purple-900/20 flex items-center justify-center">
-                              <span className="text-xs font-bold text-purple-600 dark:text-purple-400">L</span>
-                            </div>
-                            <div>
-                              <span className="text-sm font-medium">Linear Integration</span>
-                              <p className="text-xs text-muted-foreground">Sync with Linear issues</p>
-                            </div>
-                          </div>
-                          <Button size="sm" variant="outline">Connect</Button>
-                        </div>
-                      </div>
-                      <div className="border rounded-lg p-4 hover:bg-accent/50 transition-colors">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded bg-gray-100 dark:bg-gray-900/20 flex items-center justify-center">
-                              <span className="text-xs font-bold text-gray-600 dark:text-gray-400">A</span>
-                            </div>
-                            <div>
-                              <span className="text-sm font-medium">Azure DevOps</span>
-                              <p className="text-xs text-muted-foreground">Import work items, update estimates</p>
-                            </div>
-                          </div>
-                          <Button size="sm" variant="outline">Connect</Button>
-                        </div>
-                      </div>
-                      <div className="border rounded-lg p-4 hover:bg-accent/50 transition-colors">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center">
-                              <span className="text-xs font-bold text-orange-600 dark:text-orange-400">S</span>
-                            </div>
-                            <div>
-                              <span className="text-sm font-medium">Slack Notifications</span>
-                              <p className="text-xs text-muted-foreground">Session updates and summaries</p>
-                            </div>
-                          </div>
-                          <Button size="sm" variant="outline">Connect</Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Webhook Settings */}
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-medium">Webhook Configuration</h4>
-                    <div className="border rounded-lg p-4">
-                      <div className="flex flex-col items-center justify-center py-6 text-center">
-                        <Settings className="h-10 w-10 text-muted-foreground mb-3" />
-                        <h3 className="text-sm font-medium mb-1">Custom Webhooks</h3>
-                        <p className="text-xs text-muted-foreground">
-                          Set up custom webhooks to integrate with your existing workflow tools
-                        </p>
-                        <Button size="sm" variant="outline" className="mt-3">
-                          Configure Webhooks
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <TeamsTab />
           </TabsContent>
         </Tabs>
       </main>
