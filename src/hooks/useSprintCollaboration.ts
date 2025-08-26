@@ -101,7 +101,7 @@ export function useSprintCollaboration(
         if (!mounted) return
 
         if (verification.valid && verification.access) {
-          setAccessLevel(verification.access.accessLevel)
+          setAccessLevel(verification.access.accessLevel || 'view')
           setIsValid(true)
           setError(null)
         } else {
