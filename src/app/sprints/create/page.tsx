@@ -40,7 +40,6 @@ function CreateSprintForm() {
   const [selectedEpic, setSelectedEpic] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [allowGuestAccess, setAllowGuestAccess] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [password, setPassword] = useState('')
@@ -162,17 +161,15 @@ function CreateSprintForm() {
         newErrors.endDate = 'End date must be after start date'
       }
     } else if (step === 3) {
-      // Security - use state values directly
-      if (!allowGuestAccess) {
-        if (!password.trim()) {
-          newErrors.password = 'Password is required for protected sprints'
-        } else if (password.length < 6) {
-          newErrors.password = 'Password must be at least 6 characters'
-        }
-        
-        if (password !== confirmPassword) {
-          newErrors.confirmPassword = 'Passwords do not match'
-        }
+      // Security - password is always required
+      if (!password.trim()) {
+        newErrors.password = 'Password is required'
+      } else if (password.length < 6) {
+        newErrors.password = 'Password must be at least 6 characters'
+      }
+      
+      if (password !== confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match'
       }
     }
 
@@ -199,15 +196,8 @@ function CreateSprintForm() {
     setIsLoading(true)
     
     try {
-      // Use the state value directly - much simpler!
-      console.log('Sprint creation debug:', {
-        password: password,
-        passwordLength: password.length,
-        allowGuestAccess
-      })
-      
-      // For guest access, no password needed. For protected sprints, use the actual password.
-      const finalPassword = allowGuestAccess ? 'guest_access_no_password' : password.trim()
+      // Use the password directly
+      const finalPassword = password.trim()
       
       console.log('Final password being sent:', finalPassword)
       
@@ -221,7 +211,7 @@ function CreateSprintForm() {
         endDate: new Date(endDate),
         password: finalPassword,
         storyIds: selectedStories,
-        allowGuestAccess,
+        allowGuestAccess: false,
         hostId: user.uid,
         hostName: user.displayName || user.email || 'Anonymous Host'
       }
@@ -478,30 +468,9 @@ function CreateSprintForm() {
                     Sprint Access Control
                   </h2>
                   
-                  {/* Access Type */}
+                  {/* Password Fields - Always Required */}
                   <div className="space-y-4">
-                    <div>
-                      <label className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={allowGuestAccess}
-                          onChange={(e) => setAllowGuestAccess(e.target.checked)}
-                          className="rounded border-slate-300 dark:border-slate-600 text-slate-600 focus:ring-slate-500"
-                        />
-                        <div>
-                          <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                            Allow Guest Access
-                          </div>
-                          <div className="text-sm text-slate-600 dark:text-slate-400">
-                            Anyone with the link can join as a viewer without a password
-                          </div>
-                        </div>
-                      </label>
-                    </div>
-
-                    {/* Password Fields */}
-                    {!allowGuestAccess && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                             Sprint Password *
@@ -551,7 +520,6 @@ function CreateSprintForm() {
                           {errors.confirmPassword && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.confirmPassword}</p>}
                         </div>
                       </div>
-                    )}
 
                     {/* Security Info */}
                     <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
@@ -563,16 +531,16 @@ function CreateSprintForm() {
                           </h3>
                           <ul className="text-sm text-slate-700 dark:text-slate-300 mt-2 space-y-2">
                             <li>
-                              <strong className="text-slate-900 dark:text-slate-100">Guest Viewers:</strong> 
-                              <span className="ml-1">Can see stories and progress (read-only)</span>
+                              <strong className="text-slate-900 dark:text-slate-100">Team Members:</strong> 
+                              <span className="ml-1">Can participate, move stories, and collaborate based on their role</span>
                             </li>
                             <li>
-                              <strong className="text-slate-900 dark:text-slate-100">Contributors:</strong> 
-                              <span className="ml-1">Can move stories and add comments (with password)</span>
+                              <strong className="text-slate-900 dark:text-slate-100">Sprint Host:</strong> 
+                              <span className="ml-1">Full sprint control including completion and settings</span>
                             </li>
                             <li>
-                              <strong className="text-slate-900 dark:text-slate-100">Admin:</strong> 
-                              <span className="ml-1">Full sprint control (sprint creator only)</span>
+                              <strong className="text-slate-900 dark:text-slate-100">Password Required:</strong> 
+                              <span className="ml-1">All participants must enter the sprint password to join</span>
                             </li>
                           </ul>
                         </div>

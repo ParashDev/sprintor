@@ -330,12 +330,6 @@ export interface UpdateSprintRequest {
   }>
 }
 
-export interface JoinSprintRequest {
-  sprintId: string
-  password?: string               // Required if sprint is password-protected
-  participantName: string
-  role?: 'viewer' | 'contributor'
-}
 
 export interface SprintBoardState {
   sprint: Sprint

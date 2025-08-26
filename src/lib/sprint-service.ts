@@ -27,7 +27,6 @@ import type {
   SprintActivity,
   CreateSprintRequest,
   UpdateSprintRequest,
-  JoinSprintRequest,
   FirestoreSprint,
   FirestoreSprintStory,
   SprintMetrics,
@@ -425,51 +424,6 @@ export async function deleteSprint(sprintId: string): Promise<void> {
   }
 }
 
-// === SPRINT ACCESS CONTROL ===
-
-// Verify sprint password and grant access
-export async function joinSprint(request: JoinSprintRequest): Promise<{ success: boolean; accessToken?: string; error?: string }> {
-  try {
-    const sprint = await getSprint(request.sprintId)
-    if (!sprint) {
-      return { success: false, error: 'Sprint not found' }
-    }
-    
-    // Check if password is required
-    if (!sprint.allowGuestAccess && request.password) {
-      const passwordValid = await verifyPassword(request.password, sprint.password)
-      if (!passwordValid) {
-        return { success: false, error: 'Invalid password' }
-      }
-    }
-    
-    // Generate access token
-    const accessToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-    
-    // Store access record
-    const accessRecord: SprintAccess = {
-      sprintId: request.sprintId,
-      participantId: Math.random().toString(36).substring(2, 9),
-      accessLevel: request.role === 'contributor' ? 'contribute' : 'view',
-      passwordRequired: !sprint.allowGuestAccess,
-      sessionToken: accessToken,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-      grantedAt: new Date(),
-      grantedBy: 'system'
-    }
-    
-    await setDoc(doc(db, 'sprintAccess', accessToken), {
-      ...accessRecord,
-      grantedAt: serverTimestamp(),
-      expiresAt: Timestamp.fromDate(accessRecord.expiresAt!)
-    })
-    
-    return { success: true, accessToken }
-  } catch (error) {
-    console.error('Error joining sprint:', error)
-    return { success: false, error: 'Failed to join sprint' }
-  }
-}
 
 // Verify access token
 export async function verifySprintAccess(accessToken: string): Promise<SprintAccess | null> {
