@@ -19,7 +19,7 @@ export interface SprintPermissions {
   
   // Sprint Control
   canStartSprint: boolean
-  canEndSprint: boolean
+  canCompleteSprint: boolean
   canEditSprintDetails: boolean
   
   // Collaboration
@@ -54,7 +54,7 @@ export function getSprintPermissions(role: TeamMemberRole, isSprintHost: boolean
       canMoveToTesting: true,
       canMoveToDone: true,
       canStartSprint: true,
-      canEndSprint: true,
+      canCompleteSprint: true,
       canEditSprintDetails: true,
       canAddComments: true,
       canEditComments: true,
@@ -86,7 +86,7 @@ export function getSprintPermissions(role: TeamMemberRole, isSprintHost: boolean
         
         // Sprint lifecycle control
         canStartSprint: true,
-        canEndSprint: true,
+        canCompleteSprint: true,
         canEditSprintDetails: true,
         
         // Collaboration
@@ -120,7 +120,7 @@ export function getSprintPermissions(role: TeamMemberRole, isSprintHost: boolean
         
         // Process control
         canStartSprint: true,
-        canEndSprint: true,
+        canCompleteSprint: true,
         canEditSprintDetails: true,
         
         // Collaboration facilitation
@@ -154,7 +154,7 @@ export function getSprintPermissions(role: TeamMemberRole, isSprintHost: boolean
         
         // Limited sprint control
         canStartSprint: false,
-        canEndSprint: false,
+        canCompleteSprint: false,
         canEditSprintDetails: false,
         
         // Analysis collaboration
@@ -188,7 +188,7 @@ export function getSprintPermissions(role: TeamMemberRole, isSprintHost: boolean
         
         // No sprint control
         canStartSprint: false,
-        canEndSprint: false,
+        canCompleteSprint: false,
         canEditSprintDetails: false,
         
         // Development collaboration
@@ -222,7 +222,7 @@ export function getSprintPermissions(role: TeamMemberRole, isSprintHost: boolean
         
         // No sprint control
         canStartSprint: false,
-        canEndSprint: false,
+        canCompleteSprint: false,
         canEditSprintDetails: false,
         
         // Testing collaboration
@@ -256,7 +256,7 @@ export function getSprintPermissions(role: TeamMemberRole, isSprintHost: boolean
         
         // No sprint control
         canStartSprint: false,
-        canEndSprint: false,
+        canCompleteSprint: false,
         canEditSprintDetails: false,
         
         // Limited collaboration

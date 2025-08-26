@@ -799,6 +799,33 @@ function convertSprintAttemptForFirestore(attempt: SprintAttempt): Record<string
 }
 
 // Complete a sprint and handle story reversion
+// Clean up sprintAccess tokens for completed/cancelled sprints
+async function cleanupSprintAccessTokens(sprintId: string): Promise<void> {
+  try {
+    const accessTokensQuery = query(
+      collection(db, 'sprintAccess'),
+      where('sprintId', '==', sprintId)
+    )
+    
+    const snapshot = await getDocs(accessTokensQuery)
+    
+    if (snapshot.empty) {
+      return // No tokens to clean up
+    }
+    
+    const batch = writeBatch(db)
+    
+    snapshot.docs.forEach(doc => {
+      batch.delete(doc.ref)
+    })
+    
+    await batch.commit()
+  } catch (error) {
+    console.error('Error cleaning up sprint access tokens:', error)
+    // Don't throw error - cleanup failure shouldn't block sprint completion
+  }
+}
+
 export async function completeSprint(request: CompleteSprintRequest): Promise<SprintCompletionResult> {
   try {
     const sprint = await getSprint(request.sprintId)
@@ -1026,6 +1053,9 @@ export async function completeSprint(request: CompleteSprintRequest): Promise<Sp
     
     // Commit all changes atomically
     await batch.commit()
+    
+    // Clean up sprint access tokens - no longer needed for completed sprint
+    await cleanupSprintAccessTokens(request.sprintId)
     
     // Update epic counts for affected epics
     for (const epicId of epicImpacts.keys()) {

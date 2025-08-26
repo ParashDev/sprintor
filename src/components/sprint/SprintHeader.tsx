@@ -33,7 +33,7 @@ interface SprintHeaderProps {
   isSprintHost?: boolean
   onAddStory?: () => void
   onStartSprint?: () => void
-  onEndSprint?: () => void
+  onCompleteSprint?: () => void
   onLeave?: () => void
   isStartingSprint?: boolean
 }
@@ -48,7 +48,7 @@ export function SprintHeader({
   isSprintHost = false,
   onAddStory,
   onStartSprint,
-  onEndSprint,
+  onCompleteSprint,
   onLeave,
   isStartingSprint = false
 }: SprintHeaderProps) {
@@ -169,13 +169,13 @@ export function SprintHeader({
                 </button>
               )}
               
-              {permissions.canEndSprint && sprint.status === 'active' && (
+              {permissions.canCompleteSprint && sprint.status === 'active' && (
                 <button
-                  onClick={onEndSprint}
+                  onClick={onCompleteSprint}
                   className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition-colors shadow-sm hover:shadow-md"
                 >
                   <Square className="w-4 h-4" />
-                  End Sprint
+                  Complete Sprint
                 </button>
               )}
               
@@ -329,9 +329,9 @@ export function SprintHeader({
               </button>
             )}
             
-            {permissions.canEndSprint && sprint.status === 'active' && (
+            {permissions.canCompleteSprint && sprint.status === 'active' && (
               <button
-                onClick={onEndSprint}
+                onClick={onCompleteSprint}
                 className="flex items-center justify-center gap-2 py-3 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition-colors shadow-sm hover:shadow-md text-sm"
               >
                 <Square className="w-4 h-4" />

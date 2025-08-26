@@ -294,10 +294,10 @@ export function SprintBoard({
     }
   }
 
-  // Handle ending/completing the sprint
-  const handleEndSprint = () => {
+  // Handle completing the sprint
+  const handleCompleteSprint = () => {
     // NEW: Use role-based permission check
-    if (!permissions.canEndSprint) return
+    if (!permissions.canCompleteSprint) return
     setShowCompletionDialog(true)
   }
 
@@ -351,7 +351,7 @@ export function SprintBoard({
         isSprintHost={isSprintHost}
         onAddStory={() => setShowAddStoryModal(true)}
         onStartSprint={handleStartSprint}
-        onEndSprint={handleEndSprint}
+        onCompleteSprint={handleCompleteSprint}
         onLeave={onLeave}
         isStartingSprint={isStartingSprint}
       />
