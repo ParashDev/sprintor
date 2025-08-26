@@ -596,6 +596,7 @@ export async function grantHostAccess(sprintId: string, hostId: string): Promise
       sprintId,
       participantId: hostId,
       accessLevel: 'admin',
+      teamRole: 'product_owner', // Host gets product owner role
       passwordRequired: false,
       sessionToken: accessToken,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days for host
