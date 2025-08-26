@@ -43,13 +43,18 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Teams collection (future feature)
+    // Teams collection
     match /teams/{teamId} {
-      // Team owners and members can read
-      allow read: if request.auth != null;
+      // Allow anonymous read access for sprint access verification
+      // This is needed so that anonymous users joining sprints can verify their email
+      // against team member lists
+      allow read: if true;
       
-      // Only authenticated users can write
-      allow write: if request.auth != null;
+      // Only authenticated users can create teams
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.ownerId;
+      
+      // Only team owners can update/delete their teams
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.ownerId;
     }
     
     // User profiles collection

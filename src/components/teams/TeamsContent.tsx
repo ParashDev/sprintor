@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -49,6 +49,16 @@ export function TeamsContent({
   const [showManageModal, setShowManageModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
+
+  // Update selectedTeam when teams array changes (for real-time updates)
+  useEffect(() => {
+    if (selectedTeam) {
+      const updatedTeam = teams.find(team => team.id === selectedTeam.id)
+      if (updatedTeam) {
+        setSelectedTeam(updatedTeam)
+      }
+    }
+  }, [teams, selectedTeam])
 
   const getRoleIcon = (role: string) => {
     switch (role) {

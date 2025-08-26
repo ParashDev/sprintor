@@ -1,14 +1,20 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { Lock, Eye, EyeOff, Users, Calendar, Target } from 'lucide-react'
-import type { Sprint } from '@/types/sprint'
+import { Lock, Eye, EyeOff, Users, Calendar, Target, Mail, User } from 'lucide-react'
+import type { Sprint, TeamMemberRole } from '@/types/sprint'
 import { validateSprintAccess } from '@/lib/sprint-access-service'
 
 interface SprintPasswordModalProps {
   sprint: Sprint | null
   isOpen: boolean
-  onSuccess: (accessData: { accessToken: string; participantId: string; accessLevel: 'view' | 'contribute' | 'admin' }) => void
+  onSuccess: (accessData: { 
+    accessToken: string
+    participantId: string
+    teamRole?: TeamMemberRole
+    memberName?: string
+    accessLevel?: 'view' | 'contribute' | 'admin'
+  }) => void
   onClose: () => void
 }
 
@@ -18,38 +24,35 @@ export function SprintPasswordModal({
   onSuccess, 
   onClose 
 }: SprintPasswordModalProps) {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [participantName, setParticipantName] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  const passwordInputRef = useRef<HTMLInputElement>(null)
   const nameInputRef = useRef<HTMLInputElement>(null)
 
   // Clear form when modal opens/closes
   useEffect(() => {
     if (isOpen) {
+      setName('')
+      setEmail('')
       setPassword('')
-      setParticipantName('')
       setError('')
       // Focus on first input after animation
       setTimeout(() => {
-        if (sprint?.allowGuestAccess) {
-          nameInputRef.current?.focus()
-        } else {
-          passwordInputRef.current?.focus()
-        }
+        nameInputRef.current?.focus()
       }, 100)
     }
-  }, [isOpen, sprint?.allowGuestAccess])
+  }, [isOpen])
 
-  // Get stored participant name from localStorage
+  // Get stored participant info from localStorage
   useEffect(() => {
     if (isOpen) {
       const storedName = localStorage.getItem('sprintor_participant_name')
-      if (storedName) {
-        setParticipantName(storedName)
-      }
+      const storedEmail = localStorage.getItem('sprintor_participant_email')
+      if (storedName) setName(storedName)
+      if (storedEmail) setEmail(storedEmail)
     }
   }, [isOpen])
 
@@ -59,53 +62,74 @@ export function SprintPasswordModal({
 
     if (!sprint) return
 
-    // Validate form
-    if (!sprint.allowGuestAccess && !password.trim()) {
-      setError('Password is required')
+    // Validate all fields are required
+    if (!name.trim()) {
+      setError('Your name is required')
       return
     }
 
-    if (!participantName.trim()) {
-      setError('Your name is required')
+    if (!email.trim()) {
+      setError('Email is required to verify team membership')
+      return
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email.trim())) {
+      setError('Please enter a valid email address')
+      return
+    }
+
+    if (!password.trim()) {
+      setError('Sprint password is required')
       return
     }
 
     setIsLoading(true)
 
     try {
-      console.log('Validating sprint access:', {
+      console.log('Validating sprint access with team verification:', {
         sprintId: sprint.id,
-        hasPassword: !!password.trim(),
-        participantName: participantName.trim(),
-        allowGuestAccess: sprint.allowGuestAccess
+        email: email.trim(),
+        name: name.trim(),
+        hasPassword: !!password.trim()
       })
       
       const result = await validateSprintAccess(
         sprint.id,
-        password.trim() || undefined,
-        participantName.trim()
+        password.trim(),
+        name.trim(),
+        undefined,  // hostId
+        email.trim()  // NEW: Pass email for team verification
       )
 
       console.log('Sprint access validation result:', result)
 
-      if (result.success && result.accessToken && result.participantId && result.accessLevel) {
-        // Store participant name for next time
-        localStorage.setItem('sprintor_participant_name', participantName.trim())
+      if (result.success && result.accessToken && result.participantId) {
+        // Store participant info for next time
+        localStorage.setItem('sprintor_participant_name', name.trim())
+        localStorage.setItem('sprintor_participant_email', email.trim())
         
-        console.log('Calling onSuccess with:', {
-          accessToken: result.accessToken.substring(0, 10) + '...',
-          participantId: result.participantId,
-          accessLevel: result.accessLevel
-        })
         
         onSuccess({
           accessToken: result.accessToken,
           participantId: result.participantId,
+          // NEW: Pass role-based access data
+          teamRole: result.teamRole,
+          memberName: result.memberName,
+          // DEPRECATED: Keep for backward compatibility
           accessLevel: result.accessLevel
         })
       } else {
         console.log('Sprint access validation failed:', result.error)
-        setError(result.error || 'Failed to join sprint')
+        // Provide specific error messages
+        if (result.error === 'Not a team member') {
+          setError('Access denied. Only team members can join this sprint. Please contact your team lead.')
+        } else if (result.error === 'Incorrect password') {
+          setError('Incorrect sprint password')
+        } else {
+          setError(result.error || 'Failed to join sprint')
+        }
       }
     } catch (error) {
       console.error('Error joining sprint:', error)
@@ -145,22 +169,15 @@ export function SprintPasswordModal({
         {/* Header */}
         <div className="p-6 pb-4">
           <div className="flex items-center justify-center w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full mx-auto mb-4">
-            {sprint.allowGuestAccess ? (
-              <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            ) : (
-              <Lock className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-            )}
+            <Lock className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
           
           <div className="text-center">
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-              Join Sprint
+              Join Sprint Board
             </h2>
             <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-              {sprint.allowGuestAccess 
-                ? 'Enter your name to join this sprint' 
-                : 'This sprint is password protected'
-              }
+              Team members only - Verify your identity to access
             </p>
           </div>
         </div>
@@ -214,62 +231,87 @@ export function SprintPasswordModal({
         {/* Form */}
         <form onSubmit={handleSubmit} className="px-6 pb-6">
           <div className="space-y-4">
-            {/* Participant Name */}
+            {/* Name */}
             <div>
               <label 
                 htmlFor="participantName" 
                 className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
               >
+                <User className="w-4 h-4 inline mr-1" />
                 Your Name
               </label>
               <input
                 ref={nameInputRef}
                 id="participantName"
                 type="text"
-                value={participantName}
-                onChange={(e) => setParticipantName(e.target.value)}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 placeholder="Enter your name"
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 disabled={isLoading}
                 maxLength={50}
+                required
               />
             </div>
 
-            {/* Password (only if not guest access) */}
-            {!sprint.allowGuestAccess && (
-              <div>
-                <label 
-                  htmlFor="password" 
-                  className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+            {/* Email */}
+            <div>
+              <label 
+                htmlFor="participantEmail" 
+                className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+              >
+                <Mail className="w-4 h-4 inline mr-1" />
+                Team Member Email
+              </label>
+              <input
+                id="participantEmail"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your.email@company.com"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                disabled={isLoading}
+                required
+              />
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Must match your registered team email
+              </p>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label 
+                htmlFor="password" 
+                className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1"
+              >
+                <Lock className="w-4 h-4 inline mr-1" />
+                Sprint Password
+              </label>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter sprint password"
+                  className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={isLoading}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                  disabled={isLoading}
                 >
-                  Sprint Password
-                </label>
-                <div className="relative">
-                  <input
-                    ref={passwordInputRef}
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter sprint password"
-                    className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    disabled={isLoading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                    disabled={isLoading}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Error Message */}
@@ -282,10 +324,8 @@ export function SprintPasswordModal({
           {/* Access Level Info */}
           <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             <p className="text-sm text-blue-700 dark:text-blue-300">
-              {sprint.allowGuestAccess 
-                ? '👀 You\'ll join as a viewer and can see all stories and progress'
-                : '✏️ You\'ll join as a contributor and can move stories and add comments'
-              }
+              <Users className="w-4 h-4 inline mr-1" />
+              Only registered team members can access this sprint board
             </p>
           </div>
 
@@ -301,13 +341,13 @@ export function SprintPasswordModal({
             </button>
             <button
               type="submit"
-              disabled={isLoading || !participantName.trim() || (!sprint.allowGuestAccess && !password.trim())}
+              disabled={isLoading || !name.trim() || !email.trim() || !password.trim()}
               className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Joining...
+                  Verifying...
                 </>
               ) : (
                 'Join Sprint'
@@ -319,7 +359,7 @@ export function SprintPasswordModal({
         {/* Footer */}
         <div className="px-6 py-4 bg-slate-50 dark:bg-slate-750 rounded-b-xl border-t border-slate-200 dark:border-slate-700">
           <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
-            By joining this sprint, you agree to collaborate respectfully and follow the team&apos;s working agreements.
+            Access restricted to project team members only. Contact your team lead if you need access.
           </p>
         </div>
       </div>

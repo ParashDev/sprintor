@@ -37,7 +37,6 @@ export function SprintCompletionDialog({
   const [isCompleting, setIsCompleting] = useState(false)
   const [completedStories, setCompletedStories] = useState<SprintStory[]>([])
   const [incompleteStories, setIncompleteStories] = useState<SprintStory[]>([])
-  const [expandedStoryNotes, setExpandedStoryNotes] = useState(false)
 
   useEffect(() => {
     if (sprint) {
@@ -99,6 +98,10 @@ export function SprintCompletionDialog({
     
   const completedPoints = completedStories.reduce((sum, s) => sum + (s.storyPoints || 0), 0)
   const totalPoints = sprint.stories.reduce((sum, s) => sum + (s.storyPoints || 0), 0)
+  
+  // Check if all incomplete stories have notes
+  const allIncompleteStoriesHaveNotes = incompleteStories.length === 0 || 
+    incompleteStories.every(story => (storyNotes[story.id] || '').trim().length > 0)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -162,61 +165,66 @@ export function SprintCompletionDialog({
 
           {/* Incomplete Stories Warning with Notes */}
           {incompleteStories.length > 0 && (
-            <div className="space-y-3">
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
+            <div className="space-y-4">
+              <Alert className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20">
+                <AlertTriangle className="h-4 w-4 text-yellow-600" />
                 <AlertDescription>
                   <strong>{incompleteStories.length} incomplete {incompleteStories.length === 1 ? 'story' : 'stories'}</strong> will be returned to the backlog for re-grooming.
-                  <button
-                    type="button"
-                    onClick={() => setExpandedStoryNotes(!expandedStoryNotes)}
-                    className="text-sm text-primary hover:underline ml-2"
-                  >
-                    {expandedStoryNotes ? 'Hide' : 'Add'} story-specific notes
-                  </button>
                 </AlertDescription>
               </Alert>
               
-              {/* Story-specific notes section */}
-              {expandedStoryNotes && (
-                <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-3">
+              {/* Story-specific notes section - Always visible */}
+              <div className="bg-muted/50 border border-border rounded-lg p-3 space-y-3">
+                <div className="flex items-center justify-between">
                   <h4 className="text-sm font-medium flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-yellow-600" />
-                    Story-Specific Retrospective Notes
+                    Story-Specific Notes <span className="text-red-500">*</span>
                   </h4>
-                  <p className="text-xs text-muted-foreground">
-                    Add notes for why each story couldn&apos;t be completed. This helps with future estimation.
-                  </p>
-                  <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {incompleteStories.map(story => (
-                      <div key={story.id} className="space-y-2">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
+                  <span className="text-xs text-muted-foreground bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 rounded">
+                    Required for incomplete stories
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  <strong>Please explain why each incomplete story couldn't be finished.</strong> This information will help the team during re-grooming and improve future sprint planning.
+                </p>
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {incompleteStories.map(story => (
+                    <div key={story.id} className="bg-white dark:bg-slate-800 border rounded-lg p-2 space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
                             <p className="text-sm font-medium">{story.title}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-xs text-muted-foreground">
-                                Status reached: {story.sprintStatus}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                              Status: {story.sprintStatus?.replace('_', ' ').toUpperCase()}
+                            </span>
+                            {story.storyPoints && (
+                              <span className="bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded">
+                                {story.storyPoints} points
                               </span>
-                              {story.storyPoints && (
-                                <span className="text-xs text-muted-foreground">
-                                  • {story.storyPoints} pts
-                                </span>
-                              )}
-                            </div>
+                            )}
                           </div>
                         </div>
+                      </div>
+                      <div>
+                        <Label className="text-xs text-muted-foreground mb-1 block">
+                          Why wasn't this story completed? <span className="text-red-500">*</span>
+                        </Label>
                         <Textarea
-                          placeholder="Why couldn't this story be completed? Any blockers or issues?"
+                          placeholder="e.g., Blocked by dependencies, technical complexity underestimated, requirements changed, external API issues..."
                           value={storyNotes[story.id] || ''}
                           onChange={(e) => updateStoryNote(story.id, e.target.value)}
                           rows={2}
                           className="text-sm"
+                          required
                         />
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
             </div>
           )}
 
@@ -268,30 +276,40 @@ export function SprintCompletionDialog({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t flex justify-end gap-3 shrink-0 bg-background">
-          <Button
-            variant="outline"
-            onClick={onClose}
-            disabled={isCompleting}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleComplete}
-            disabled={isCompleting}
-          >
-            {isCompleting ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                Completing Sprint...
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="mr-2 h-4 w-4" />
-                Complete Sprint
-              </>
-            )}
-          </Button>
+        <div className="px-6 py-4 border-t shrink-0 bg-background">
+          {/* Validation message */}
+          {incompleteStories.length > 0 && !allIncompleteStoriesHaveNotes && (
+            <div className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-sm text-yellow-700 dark:text-yellow-300">
+              <AlertTriangle className="w-4 h-4 inline mr-2" />
+              Please provide reasons for all incomplete stories before completing the sprint.
+            </div>
+          )}
+          
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={isCompleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleComplete}
+              disabled={isCompleting || !allIncompleteStoriesHaveNotes}
+            >
+              {isCompleting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Completing Sprint...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Complete Sprint
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

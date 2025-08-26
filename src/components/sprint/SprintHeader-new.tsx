@@ -172,7 +172,7 @@ export function SprintHeader({
               {permissions.canEndSprint && sprint.status === 'active' && (
                 <button
                   onClick={onEndSprint}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition-colors shadow-sm hover:shadow-md"
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 hover:border-gray-400 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
                 >
                   <Square className="w-4 h-4" />
                   End Sprint
@@ -199,10 +199,10 @@ export function SprintHeader({
               
               <button
                 onClick={onLeave}
-                className="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 hover:border-gray-400 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
+                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                title="Leave Sprint"
               >
-                <LogOut className="w-4 h-4" />
-                Leave
+                <LogOut className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -282,12 +282,10 @@ export function SprintHeader({
           
           {/* User Info Display - Mobile */}
           {memberName && (
-            <div className="flex items-center gap-1.5 mb-2 px-2 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 w-fit">
-              <div className="flex items-center gap-1.5">
-                <div className="scale-75">
-                  {getRoleIcon(teamRole)}
-                </div>
-                <div className="text-xs">
+            <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 w-fit">
+              <div className="flex items-center gap-2">
+                {getRoleIcon(teamRole)}
+                <div className="text-sm">
                   <span className="font-medium text-gray-900 dark:text-white">
                     {memberName}
                   </span>
@@ -312,58 +310,64 @@ export function SprintHeader({
             </p>
           )}
           
-          {/* Mobile Actions - 2x2 Grid with full width buttons */}
-          <div className="mb-3 grid grid-cols-2 gap-2">
-            {permissions.canStartSprint && sprint.status === 'draft' && (
+          {/* Mobile Actions - Properly spaced */}
+          <div className="flex items-center justify-between mb-3">
+            {/* Primary Actions */}
+            <div className="flex items-center gap-2">
+              {permissions.canStartSprint && sprint.status === 'draft' && (
+                <button
+                  onClick={onStartSprint}
+                  disabled={isStartingSprint}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+                >
+                  {isStartingSprint ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+                  ) : (
+                    <Play className="w-4 h-4" />
+                  )}
+                  {isStartingSprint ? 'Starting...' : 'Start Sprint'}
+                </button>
+              )}
+              
+              {permissions.canEndSprint && sprint.status === 'active' && (
+                <button
+                  onClick={onEndSprint}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded font-medium transition-colors shadow-sm hover:shadow-md"
+                >
+                  <Square className="w-4 h-4" />
+                  End Sprint
+                </button>
+              )}
+              
+              {permissions.canCreateStory && (
+                <button
+                  onClick={onAddStory}
+                  className="flex items-center gap-2 px-3 py-2 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 hover:border-gray-400 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded font-medium transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add
+                </button>
+              )}
+            </div>
+            
+            {/* Secondary Actions */}
+            <div className="flex items-center gap-2">
               <button
-                onClick={onStartSprint}
-                disabled={isStartingSprint}
-                className="flex items-center justify-center gap-2 py-3 bg-gray-900 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md text-sm"
+                onClick={() => setShowStats(!showStats)}
+                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+                title="Toggle Details"
               >
-                {isStartingSprint ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
-                ) : (
-                  <Play className="w-4 h-4" />
-                )}
-                {isStartingSprint ? 'Starting...' : 'Start Sprint'}
+                {showStats ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </button>
-            )}
-            
-            {permissions.canEndSprint && sprint.status === 'active' && (
+              
               <button
-                onClick={onEndSprint}
-                className="flex items-center justify-center gap-2 py-3 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition-colors shadow-sm hover:shadow-md text-sm"
+                onClick={onLeave}
+                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+                title="Leave Sprint"
               >
-                <Square className="w-4 h-4" />
-                End Sprint
+                <LogOut className="w-4 h-4" />
               </button>
-            )}
-            
-            {permissions.canCreateStory && (
-              <button
-                onClick={onAddStory}
-                className="flex items-center justify-center gap-2 py-3 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 hover:border-gray-400 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors text-sm"
-              >
-                <Plus className="w-4 h-4" />
-                Add Story
-              </button>
-            )}
-            
-            <button
-              onClick={() => setShowStats(!showStats)}
-              className="flex items-center justify-center gap-2 py-3 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 hover:border-gray-400 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors text-sm"
-            >
-              {showStats ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-              Details
-            </button>
-            
-            <button
-              onClick={onLeave}
-              className="flex items-center justify-center gap-2 py-3 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 rounded-lg font-medium transition-colors text-sm"
-            >
-              <LogOut className="w-4 h-4" />
-              Leave Sprint
-            </button>
+            </div>
           </div>
           
           {/* Mobile Stats */}
@@ -390,38 +394,38 @@ export function SprintHeader({
 
         {/* Expanded Stats Panel (Both Desktop & Mobile) */}
         {showStats && (
-          <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="grid grid-cols-4 gap-2 text-xs">
+          <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
               <div className="text-center">
-                <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{sprint.stories.length}</div>
-                <div className="text-gray-500 dark:text-gray-400 text-xs">Total</div>
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{sprint.stories.length}</div>
+                <div className="text-gray-500 dark:text-gray-400">Total Stories</div>
               </div>
               
               <div className="text-center">
-                <div className="text-lg font-bold text-green-600 dark:text-green-400">{completedStories.length}</div>
-                <div className="text-gray-500 dark:text-gray-400 text-xs">Done</div>
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">{completedStories.length}</div>
+                <div className="text-gray-500 dark:text-gray-400">Completed</div>
               </div>
               
               <div className="text-center">
-                <div className="text-lg font-bold text-orange-600 dark:text-orange-400">{inProgressStories.length}</div>
-                <div className="text-gray-500 dark:text-gray-400 text-xs">Active</div>
+                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{inProgressStories.length}</div>
+                <div className="text-gray-500 dark:text-gray-400">In Progress</div>
               </div>
               
               <div className="text-center">
-                <div className="text-lg font-bold text-purple-600 dark:text-purple-400">{participants.length}</div>
-                <div className="text-gray-500 dark:text-gray-400 text-xs">Team</div>
+                <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{participants.length}</div>
+                <div className="text-gray-500 dark:text-gray-400">Participants</div>
               </div>
             </div>
             
             {/* Progress Bar */}
-            <div className="mt-3">
-              <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+            <div className="mt-4">
+              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
                 <span>Sprint Progress</span>
                 <span>{Math.round(progressPercentage)}%</span>
               </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                 <div 
-                  className="bg-blue-600 dark:bg-blue-400 h-1.5 rounded-full transition-all duration-300"
+                  className="bg-blue-600 dark:bg-blue-400 h-2 rounded-full transition-all duration-300"
                   style={{ width: `${progressPercentage}%` }}
                 ></div>
               </div>
@@ -432,5 +436,3 @@ export function SprintHeader({
     </div>
   )
 }
-
-export default SprintHeader

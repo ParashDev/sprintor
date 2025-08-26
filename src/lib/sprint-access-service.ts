@@ -17,6 +17,19 @@ import { db } from './firebase'
 import type { SprintAccess } from '@/types/sprint'
 import { hashPassword, verifyPassword } from './sprint-service'
 
+// === UTILITY FUNCTIONS ===
+
+// Helper function to clean data for Firestore (remove undefined fields)
+function cleanDataForFirestore(data: Record<string, any>): Record<string, any> {
+  const cleaned: Record<string, any> = {}
+  Object.entries(data).forEach(([key, value]) => {
+    if (value !== undefined) {
+      cleaned[key] = value
+    }
+  })
+  return cleaned
+}
+
 // === ACCESS TOKEN MANAGEMENT ===
 
 // Generate secure access token
@@ -36,17 +49,22 @@ function generateParticipantId(): string {
 
 // === SPRINT ACCESS VALIDATION ===
 
-// Validate sprint access with password
+// Validate sprint access with password and team membership
 export async function validateSprintAccess(
   sprintId: string, 
   password?: string,
   participantName?: string,
-  hostId?: string  // If provided, check if user is the host
+  hostId?: string,  // If provided, check if user is the host
+  email?: string    // NEW: Email for team member verification
 ): Promise<{
   success: boolean
   accessToken?: string
   participantId?: string
+  // NEW: Return team member role for proper permission handling
+  teamRole?: 'product_owner' | 'scrum_master' | 'business_analyst' | 'developer' | 'tester' | 'stakeholder'
+  // DEPRECATED: Keep for backward compatibility
   accessLevel?: 'view' | 'contribute' | 'admin'
+  memberName?: string  // NEW: Team member's name
   error?: string
 }> {
   try {
@@ -60,6 +78,44 @@ export async function validateSprintAccess(
     
     const sprintData = sprintSnap.data()
     
+    // NEW: Team member email verification with role extraction
+    let userTeamRole: 'product_owner' | 'scrum_master' | 'business_analyst' | 'developer' | 'tester' | 'stakeholder' | undefined
+    let userMemberName: string | undefined
+    
+    if (email && sprintData.projectId) {
+      // Query all teams for this project to check if email exists in any team member
+      const teamsQuery = query(
+        collection(db, 'teams'),
+        where('projectId', '==', sprintData.projectId)
+      )
+      
+      const teamsSnapshot = await getDocs(teamsQuery)
+      let isTeamMember = false
+      
+      // Check if the provided email matches any team member email and capture their role
+      teamsSnapshot.forEach((teamDoc) => {
+        const teamData = teamDoc.data()
+        if (teamData.members && Array.isArray(teamData.members)) {
+          const member = teamData.members.find((member: any) => 
+            member.email && member.email.toLowerCase() === email.toLowerCase() && 
+            member.status === 'active'
+          )
+          if (member) {
+            isTeamMember = true
+            userTeamRole = member.role // Capture the team member's role
+            userMemberName = member.name // Capture the team member's name
+          }
+        }
+      })
+      
+      if (!isTeamMember) {
+        return { success: false, error: 'Not a team member' }
+      }
+    } else if (email) {
+      // Email provided but sprint has no project ID - deny access
+      return { success: false, error: 'Sprint access verification failed' }
+    }
+    
     // Check if user is the host (creator) - they get admin access automatically
     if (hostId && sprintData.hostId === hostId) {
       const accessToken = generateAccessToken()
@@ -69,25 +125,31 @@ export async function validateSprintAccess(
       const accessRecord: SprintAccess = {
         sprintId,
         participantId,
-        accessLevel: 'admin',
+        // NEW: Sprint host gets product_owner role by default (can be overridden)
+        teamRole: userTeamRole || 'product_owner', // Default to product_owner for host
+        accessLevel: 'admin', // DEPRECATED: Keep for backward compatibility
         passwordRequired: false,
         sessionToken: accessToken,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
         grantedAt: new Date(),
-        grantedBy: 'host_access'
+        grantedBy: 'host_access',
+        memberEmail: email,
+        memberName: userMemberName || participantName
       }
       
-      await setDoc(doc(db, 'sprintAccess', accessToken), {
+      await setDoc(doc(db, 'sprintAccess', accessToken), cleanDataForFirestore({
         ...accessRecord,
         grantedAt: serverTimestamp(),
         expiresAt: Timestamp.fromDate(accessRecord.expiresAt!)
-      })
+      }))
       
       return {
         success: true,
         accessToken,
         participantId,
-        accessLevel: 'admin'
+        teamRole: accessRecord.teamRole,
+        accessLevel: 'admin', // DEPRECATED: Keep for backward compatibility
+        memberName: accessRecord.memberName
       }
     }
     
@@ -100,25 +162,31 @@ export async function validateSprintAccess(
       const accessRecord: SprintAccess = {
         sprintId,
         participantId,
-        accessLevel: 'view',
+        // NEW: Guests get stakeholder role (view-only)
+        teamRole: userTeamRole || 'stakeholder', // Default to stakeholder for guests
+        accessLevel: 'view', // DEPRECATED: Keep for backward compatibility
         passwordRequired: false,
         sessionToken: accessToken,
         expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000), // 8 hours for guest access
         grantedAt: new Date(),
-        grantedBy: 'system'
+        grantedBy: 'system',
+        memberEmail: email,
+        memberName: userMemberName || participantName
       }
       
-      await setDoc(doc(db, 'sprintAccess', accessToken), {
+      await setDoc(doc(db, 'sprintAccess', accessToken), cleanDataForFirestore({
         ...accessRecord,
         grantedAt: serverTimestamp(),
         expiresAt: Timestamp.fromDate(accessRecord.expiresAt!)
-      })
+      }))
       
       return {
         success: true,
         accessToken,
         participantId,
-        accessLevel: 'view'
+        teamRole: accessRecord.teamRole,
+        accessLevel: 'view', // DEPRECATED: Keep for backward compatibility
+        memberName: accessRecord.memberName
       }
     }
     
@@ -136,25 +204,31 @@ export async function validateSprintAccess(
       const accessRecord: SprintAccess = {
         sprintId,
         participantId,
-        accessLevel: 'view',
+        // NEW: Fallback guests get stakeholder role (view-only)
+        teamRole: userTeamRole || 'stakeholder', // Default to stakeholder for fallback guests
+        accessLevel: 'view', // DEPRECATED: Keep for backward compatibility
         passwordRequired: false,
         sessionToken: accessToken,
         expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000),
         grantedAt: new Date(),
-        grantedBy: 'system'
+        grantedBy: 'system',
+        memberEmail: email,
+        memberName: userMemberName || participantName
       }
       
-      await setDoc(doc(db, 'sprintAccess', accessToken), {
+      await setDoc(doc(db, 'sprintAccess', accessToken), cleanDataForFirestore({
         ...accessRecord,
         grantedAt: serverTimestamp(),
         expiresAt: Timestamp.fromDate(accessRecord.expiresAt!)
-      })
+      }))
       
       return {
         success: true,
         accessToken,
         participantId,
-        accessLevel: 'view'
+        teamRole: accessRecord.teamRole,
+        accessLevel: 'view', // DEPRECATED: Keep for backward compatibility
+        memberName: accessRecord.memberName
       }
     }
     
@@ -178,12 +252,16 @@ export async function validateSprintAccess(
     const accessRecord: SprintAccess = {
       sprintId,
       participantId,
-      accessLevel: 'contribute', // Contributors get more access than guests
+      // NEW: Use team member's actual role, default to developer for password auth
+      teamRole: userTeamRole || 'developer', // Default to developer for password-authenticated users
+      accessLevel: 'contribute', // DEPRECATED: Keep for backward compatibility
       passwordRequired: true,
       sessionToken: accessToken,
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours for authenticated access
       grantedAt: new Date(),
-      grantedBy: 'password_auth'
+      grantedBy: 'password_auth',
+      memberEmail: email,
+      memberName: userMemberName || participantName
     }
     
     await setDoc(doc(db, 'sprintAccess', accessToken), {
@@ -196,7 +274,9 @@ export async function validateSprintAccess(
       success: true,
       accessToken,
       participantId,
-      accessLevel: 'contribute'
+      teamRole: accessRecord.teamRole,
+      accessLevel: 'contribute', // DEPRECATED: Keep for backward compatibility  
+      memberName: accessRecord.memberName
     }
     
   } catch (error) {

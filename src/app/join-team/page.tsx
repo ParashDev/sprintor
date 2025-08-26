@@ -18,6 +18,7 @@ function JoinTeamContent() {
   const [error, setError] = useState<string | null>(null)
   
   const nameRef = useRef<HTMLInputElement>(null)
+  const emailRef = useRef<HTMLInputElement>(null)
   const inviteCode = searchParams?.get('code')
 
   useEffect(() => {
@@ -63,6 +64,19 @@ function JoinTeamContent() {
       toast.error('Please enter your name')
       return
     }
+    
+    if (!emailRef.current?.value?.trim()) {
+      toast.error('Please enter your email')
+      return
+    }
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const memberEmail = emailRef.current.value.trim()
+    if (!emailRegex.test(memberEmail)) {
+      toast.error('Please enter a valid email address')
+      return
+    }
 
     const memberName = nameRef.current.value.trim()
 
@@ -75,6 +89,7 @@ function JoinTeamContent() {
       await addTeamMember(team.id, {
         id: memberId,
         name: memberName,
+        email: memberEmail, // Include email for sprint access verification
         role: team.defaultRole || 'developer',
         invitedBy: team.ownerId
       })
@@ -195,6 +210,23 @@ function JoinTeamContent() {
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 required
               />
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium">
+                Your Email <span className="text-destructive">*</span>
+              </label>
+              <input
+                ref={emailRef}
+                id="email"
+                type="email"
+                placeholder="your.email@company.com"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Required for sprint board access verification
+              </p>
             </div>
 
             <Button type="submit" className="w-full" disabled={joining}>

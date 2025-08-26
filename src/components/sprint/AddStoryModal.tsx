@@ -2,19 +2,34 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { X, Search, Plus, Clock, User, Target } from 'lucide-react'
-import type { Sprint, SprintStory } from '@/types/sprint'
+import type { Sprint, SprintStory, TeamMemberRole } from '@/types/sprint'
 import type { Story } from '@/types/story'
+import type { SprintPermissions } from '@/lib/sprint-permissions'
 import { getStoriesByProject } from '@/lib/story-service'
 import { addStoryToSprint } from '@/lib/sprint-service'
 
 interface AddStoryModalProps {
   sprint: Sprint
+  // NEW: Role-based permission props
+  teamRole?: TeamMemberRole
+  permissions?: SprintPermissions
+  memberName?: string
+  isSprintHost?: boolean
   isOpen: boolean
   onClose: () => void
   onStoryAdded: (story: SprintStory) => void
 }
 
-export function AddStoryModal({ sprint, isOpen, onClose, onStoryAdded }: AddStoryModalProps) {
+export function AddStoryModal({ 
+  sprint, 
+  teamRole,
+  permissions,
+  memberName,
+  isSprintHost = false,
+  isOpen, 
+  onClose, 
+  onStoryAdded 
+}: AddStoryModalProps) {
   const [availableStories, setAvailableStories] = useState<Story[]>([])
   const [filteredStories, setFilteredStories] = useState<Story[]>([])
   const [searchQuery, setSearchQuery] = useState('')

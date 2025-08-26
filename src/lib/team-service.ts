@@ -92,6 +92,7 @@ export async function createTeam(teamData: CreateTeamRequest): Promise<string> {
     const ownerMember: TeamMember = {
       id: teamData.ownerId,
       name: teamData.ownerName,
+      email: teamData.ownerEmail, // Include owner's email for sprint access verification
       role: 'product_owner',
       joinedAt: new Date(),
       lastSeen: new Date(),
@@ -334,6 +335,31 @@ export async function updateMemberRole(teamId: string, memberId: string, newRole
   } catch (error) {
     console.error('Error updating member role:', error)
     throw new Error('Failed to update member role')
+  }
+}
+
+// Update member details (name, email, role)
+export async function updateMemberDetails(teamId: string, memberId: string, updates: Partial<Pick<TeamMember, 'name' | 'email' | 'role'>>): Promise<void> {
+  try {
+    const teamRef = doc(db, 'teams', teamId)
+    const teamSnap = await getDoc(teamRef)
+    
+    if (!teamSnap.exists()) {
+      throw new Error('Team not found')
+    }
+
+    const teamData = teamSnap.data() as FirestoreTeam
+    const updatedMembers = teamData.members.map(member => 
+      member.id === memberId ? { ...member, ...updates } : member
+    )
+
+    await updateDoc(teamRef, {
+      members: updatedMembers,
+      updatedAt: serverTimestamp()
+    })
+  } catch (error) {
+    console.error('Error updating member details:', error)
+    throw new Error('Failed to update member details')
   }
 }
 

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -20,8 +20,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Crown, Shield, User, Eye, Edit, Trash2, Loader2 } from 'lucide-react'
-import { updateMemberRole, removeTeamMember, updateTeam, type Team, type TeamMember } from '@/lib/team-service'
+import { Crown, Shield, User, Eye, Edit, Trash2, Loader2, Mail, AlertCircle, UserPlus } from 'lucide-react'
+import { updateMemberRole, updateMemberDetails, removeTeamMember, updateTeam, addTeamMember, type Team, type TeamMember } from '@/lib/team-service'
 import { toast } from 'sonner'
 
 interface ManageTeamModalProps {
@@ -35,9 +35,22 @@ interface ManageTeamModalProps {
 export function ManageTeamModal({ isOpen, onClose, team, currentUserId, onTeamUpdated }: ManageTeamModalProps) {
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
   const [removingMember, setRemovingMember] = useState<TeamMember | null>(null)
+  const [showAddMember, setShowAddMember] = useState(false)
   const [newRole, setNewRole] = useState<TeamMember['role']>('developer')
+  const [addMemberRole, setAddMemberRole] = useState<TeamMember['role']>('developer')
   const [loading, setLoading] = useState(false)
   const [inviteEnabled, setInviteEnabled] = useState(team.inviteEnabled !== false)
+  
+  // Use refs for form inputs to prevent input lag
+  const editFormRefs = useRef({
+    name: null as HTMLInputElement | null,
+    email: null as HTMLInputElement | null
+  })
+  
+  const addFormRefs = useRef({
+    name: null as HTMLInputElement | null,
+    email: null as HTMLInputElement | null
+  })
 
   // Lock body scroll when modal is open
   useEffect(() => {
@@ -76,20 +89,57 @@ export function ManageTeamModal({ isOpen, onClose, team, currentUserId, onTeamUp
   const handleEditRole = (member: TeamMember) => {
     setEditingMember(member)
     setNewRole(member.role)
+    
+    // Populate form refs after modal opens
+    setTimeout(() => {
+      if (editFormRefs.current.name) editFormRefs.current.name.value = member.name
+      if (editFormRefs.current.email) editFormRefs.current.email.value = member.email || ''
+    }, 0)
   }
 
   const handleSaveRole = async () => {
     if (!editingMember) return
 
+    const name = editFormRefs.current.name?.value?.trim() || ''
+    const email = editFormRefs.current.email?.value?.trim() || ''
+
+    if (!name) {
+      toast.error('Member name is required')
+      return
+    }
+
+    // Validate email if provided
+    if (email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(email)) {
+        toast.error('Please enter a valid email address')
+        return
+      }
+    }
+
     try {
       setLoading(true)
-      await updateMemberRole(team.id, editingMember.id, newRole)
-      toast.success(`Updated ${editingMember.name}'s role to ${formatRoleName(newRole)}`)
+      
+      const updates: Partial<Pick<TeamMember, 'name' | 'email' | 'role'>> = {
+        name,
+        role: newRole
+      }
+      
+      // Only update email if it's provided or if clearing it
+      if (email) {
+        updates.email = email
+      } else if (editingMember.email) {
+        // If user cleared the email field, set to undefined
+        updates.email = undefined
+      }
+
+      await updateMemberDetails(team.id, editingMember.id, updates)
+      toast.success(`Updated ${name}'s details successfully`)
       setEditingMember(null)
       onTeamUpdated?.() // Trigger refresh of team data
     } catch (error) {
-      console.error('Error updating member role:', error)
-      toast.error('Failed to update member role')
+      console.error('Error updating member details:', error)
+      toast.error('Failed to update member details')
     } finally {
       setLoading(false)
     }
@@ -126,6 +176,69 @@ export function ManageTeamModal({ isOpen, onClose, team, currentUserId, onTeamUp
     }
   }
 
+  const handleAddMember = async () => {
+    const name = addFormRefs.current.name?.value?.trim() || ''
+    const email = addFormRefs.current.email?.value?.trim() || ''
+
+    if (!name) {
+      toast.error('Member name is required')
+      return
+    }
+
+    if (!email) {
+      toast.error('Member email is required')
+      return
+    }
+
+    // Validate email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      toast.error('Please enter a valid email address')
+      return
+    }
+
+    // Check if member with this email already exists
+    const existingMember = team.members.find(m => m.email?.toLowerCase() === email.toLowerCase())
+    if (existingMember) {
+      toast.error('A member with this email already exists')
+      return
+    }
+
+    try {
+      setLoading(true)
+      
+      // Generate a unique member ID
+      const memberId = `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      
+      await addTeamMember(team.id, {
+        id: memberId,
+        name,
+        email,
+        role: addMemberRole,
+        invitedBy: currentUserId
+      })
+
+      toast.success(`Added ${name} to the team`)
+      
+      // Reset form and close
+      if (addFormRefs.current.name) addFormRefs.current.name.value = ''
+      if (addFormRefs.current.email) addFormRefs.current.email.value = ''
+      setAddMemberRole('developer')
+      setShowAddMember(false)
+      
+      onTeamUpdated?.() // Trigger refresh of team data
+    } catch (error) {
+      console.error('Error adding member:', error)
+      if (error instanceof Error && error.message.includes('already a team member')) {
+        toast.error('This person is already a team member')
+      } else {
+        toast.error('Failed to add team member')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const isOwner = team.ownerId === currentUserId
   const canManageMembers = isOwner
 
@@ -141,21 +254,21 @@ export function ManageTeamModal({ isOpen, onClose, team, currentUserId, onTeamUp
         />
         
         {/* Modal */}
-        <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border">
+        <div className="relative bg-background rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border">
           {/* Header */}
-          <div className="px-6 py-4 border-b bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+          <div className="px-6 py-4 border-b bg-muted/50 rounded-t-xl">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                <h2 className="text-xl font-semibold">
                   Team Settings
                 </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   Manage settings and members for {team.name}
                 </p>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+                className="p-2 hover:bg-accent rounded-md transition-colors"
               >
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -171,7 +284,7 @@ export function ManageTeamModal({ isOpen, onClose, team, currentUserId, onTeamUp
                 
                 {/* Invite Settings */}
                 {canManageMembers && (
-                  <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                  <div className="space-y-4 p-6 bg-muted/30 rounded-lg">
                     <h3 className="text-lg font-medium">Invite Settings</h3>
                     
                     <div className="flex items-center justify-between p-4 border rounded-lg">
@@ -191,8 +304,21 @@ export function ManageTeamModal({ isOpen, onClose, team, currentUserId, onTeamUp
                 )}
 
                 {/* Team Members List */}
-                <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                  <h3 className="text-lg font-medium">Team Members ({team.members.length})</h3>
+                <div className="space-y-4 p-6 bg-muted/30 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-medium">Team Members ({team.members.length})</h3>
+                    {canManageMembers && (
+                      <Button
+                        size="sm"
+                        onClick={() => setShowAddMember(true)}
+                        disabled={loading}
+                        className="h-8"
+                      >
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Add Member
+                      </Button>
+                    )}
+                  </div>
                   <div className="max-h-64 overflow-y-auto space-y-3">
                     {team.members.map((member) => {
                       const isCurrentUser = member.id === currentUserId
@@ -215,6 +341,19 @@ export function ManageTeamModal({ isOpen, onClose, team, currentUserId, onTeamUp
                               <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                 {getRoleIcon(member.role)}
                                 <span>{formatRoleName(member.role)}</span>
+                              </div>
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                                {member.email ? (
+                                  <div className="flex items-center gap-1">
+                                    <Mail className="h-3 w-3" />
+                                    <span>{member.email}</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1 text-orange-600 dark:text-orange-400">
+                                    <AlertCircle className="h-3 w-3" />
+                                    <span>No email (add for sprint access)</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -252,6 +391,24 @@ export function ManageTeamModal({ isOpen, onClose, team, currentUserId, onTeamUp
                       </p>
                     </div>
                   )}
+                  
+                  {/* Sprint Access Notice */}
+                  {team.members.some(m => !m.email) && (
+                    <div className="mt-4 p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
+                        <div className="text-sm">
+                          <p className="font-medium text-orange-800 dark:text-orange-200">
+                            Sprint Access Requirement
+                          </p>
+                          <p className="text-orange-700 dark:text-orange-300 mt-1">
+                            Members without email addresses cannot access sprint boards. 
+                            {canManageMembers && ' Click the edit button to add missing emails.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
               </div>
@@ -259,7 +416,7 @@ export function ManageTeamModal({ isOpen, onClose, team, currentUserId, onTeamUp
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 border-t bg-gray-50 dark:bg-gray-800/50">
+          <div className="px-6 py-4 border-t bg-muted/50 rounded-b-xl">
             <div className="flex justify-end">
               <Button onClick={onClose}>Close</Button>
             </div>
@@ -275,19 +432,45 @@ export function ManageTeamModal({ isOpen, onClose, team, currentUserId, onTeamUp
             onClick={() => setEditingMember(null)}
           />
           
-          <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-md border z-[70]">
-            <div className="px-6 py-4 border-b bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Update Member Role
+          <div className="relative bg-background rounded-xl shadow-2xl w-full max-w-md border z-[70]">
+            <div className="px-6 py-4 border-b bg-muted/50 rounded-t-xl">
+              <h3 className="text-lg font-semibold">
+                Edit Team Member
               </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Change {editingMember.name}&apos;s role in the team
+              <p className="text-sm text-muted-foreground mt-1">
+                Update {editingMember.name}&apos;s details and permissions
               </p>
             </div>
             
             <div className="p-6 space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">New Role</label>
+                <label className="text-sm font-medium">Name</label>
+                <input
+                  ref={(el) => { if (editFormRefs.current) editFormRefs.current.name = el }}
+                  type="text"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="Member name"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Email (for sprint access)</label>
+                <div className="relative">
+                  <input
+                    ref={(el) => { if (editFormRefs.current) editFormRefs.current.email = el }}
+                    type="email"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 pr-9 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    placeholder="member@company.com"
+                  />
+                  <Mail className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Required for accessing sprint boards. Leave empty to remove email.
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Role</label>
                 <Select value={newRole} onValueChange={(value: TeamMember['role']) => setNewRole(value)}>
                   <SelectTrigger>
                     <SelectValue />
@@ -304,7 +487,7 @@ export function ManageTeamModal({ isOpen, onClose, team, currentUserId, onTeamUp
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t bg-gray-50 dark:bg-gray-800/50">
+            <div className="px-6 py-4 border-t bg-muted/50 rounded-b-xl">
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setEditingMember(null)}>
                   Cancel
@@ -313,10 +496,97 @@ export function ManageTeamModal({ isOpen, onClose, team, currentUserId, onTeamUp
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Updating...
+                      Saving...
                     </>
                   ) : (
-                    'Update Role'
+                    'Save Changes'
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Member Dialog */}
+      {showAddMember && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+            onClick={() => setShowAddMember(false)}
+          />
+          
+          <div className="relative bg-background rounded-xl shadow-2xl w-full max-w-md border z-[70]">
+            <div className="px-6 py-4 border-b bg-muted/50 rounded-t-xl">
+              <h3 className="text-lg font-semibold">
+                Add Team Member
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Manually add a new member to {team.name}
+              </p>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Name</label>
+                <input
+                  ref={(el) => { if (addFormRefs.current) addFormRefs.current.name = el }}
+                  type="text"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  placeholder="Enter member's name"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Email (required)</label>
+                <div className="relative">
+                  <input
+                    ref={(el) => { if (addFormRefs.current) addFormRefs.current.email = el }}
+                    type="email"
+                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 pr-9 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    placeholder="member@company.com"
+                  />
+                  <Mail className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Required for sprint board access
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Role</label>
+                <Select value={addMemberRole} onValueChange={(value: TeamMember['role']) => setAddMemberRole(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="z-[80]">
+                    <SelectItem value="developer">Developer - Implements features, estimates stories</SelectItem>
+                    <SelectItem value="tester">Tester - Tests features, ensures quality</SelectItem>
+                    <SelectItem value="scrum_master">Scrum Master - Facilitates ceremonies</SelectItem>
+                    <SelectItem value="business_analyst">Business Analyst - Analyzes requirements</SelectItem>
+                    <SelectItem value="stakeholder">Stakeholder - Provides business input</SelectItem>
+                    <SelectItem value="product_owner">Product Owner - Defines requirements, prioritizes backlog</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t bg-muted/50 rounded-b-xl">
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowAddMember(false)} disabled={loading}>
+                  Cancel
+                </Button>
+                <Button onClick={handleAddMember} disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Adding...
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Add Member
+                    </>
                   )}
                 </Button>
               </div>

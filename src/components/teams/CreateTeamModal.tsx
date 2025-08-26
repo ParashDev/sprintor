@@ -1,7 +1,6 @@
 "use client"
 
 import React, { useRef, useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import {
   Select,
@@ -68,6 +67,7 @@ export function CreateTeamModal({ isOpen, onClose, selectedProject }: CreateTeam
         description,
         ownerId: user.uid,
         ownerName: user.displayName || user.email || 'Unknown User',
+        ownerEmail: user.email || undefined, // Include owner's email for sprint access verification
         projectId: selectedProject.id,
         isPublic,
         defaultRole
@@ -102,21 +102,21 @@ export function CreateTeamModal({ isOpen, onClose, selectedProject }: CreateTeam
       />
       
       {/* Modal */}
-      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border">
+      <div className="relative bg-background rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border">
         {/* Header */}
-        <div className="px-6 py-4 border-b bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+        <div className="px-6 py-4 border-b bg-muted/50">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-xl font-semibold">
                 Create New Team
               </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Set up a new team for collaborative sprint planning
               </p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+              className="p-2 hover:bg-accent rounded-md transition-colors"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -132,7 +132,7 @@ export function CreateTeamModal({ isOpen, onClose, selectedProject }: CreateTeam
               
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Project Assignment */}
-                <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                <div className="space-y-4 p-6 bg-muted/30 rounded-lg">
                   <h3 className="text-lg font-medium">Project Assignment</h3>
                   
                   <div className="space-y-2">
@@ -152,7 +152,7 @@ export function CreateTeamModal({ isOpen, onClose, selectedProject }: CreateTeam
                 </div>
 
                 {/* Team Details */}
-                <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                <div className="space-y-4 p-6 bg-muted/30 rounded-lg">
                   <h3 className="text-lg font-medium">Team Details</h3>
                   
                   <div className="space-y-4">
@@ -188,7 +188,7 @@ export function CreateTeamModal({ isOpen, onClose, selectedProject }: CreateTeam
                 </div>
 
                 {/* Team Settings */}
-                <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                <div className="space-y-4 p-6 bg-muted/30 rounded-lg">
                   <h3 className="text-lg font-medium">Team Settings</h3>
                   
                   <div className="space-y-4">
@@ -236,18 +236,41 @@ export function CreateTeamModal({ isOpen, onClose, selectedProject }: CreateTeam
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t bg-gray-50 dark:bg-gray-800/50">
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSubmit} 
-              disabled={creating}
-              className="min-w-[120px]"
-            >
-              {creating ? 'Creating...' : 'Create Team'}
-            </Button>
+        <div className="px-6 py-4 border-t bg-muted/50">
+          <div className="flex justify-between items-center">
+            <div className="text-sm text-muted-foreground">
+              Fields marked with * are required
+            </div>
+            <div className="flex gap-3">
+              <button 
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2"
+                onClick={onClose}
+                disabled={creating}
+              >
+                Cancel
+              </button>
+              <button 
+                className="inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground shadow-xs hover:bg-primary/90 h-10 rounded-md px-6"
+                onClick={handleSubmit}
+                disabled={creating}
+              >
+                {creating ? (
+                  <>
+                    <svg className="mr-2 h-4 w-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v4m0 12v4m8-8h-4M6 12H2m15.5 5.5l-3-3M9.5 9.5l-3-3m12-3l-3 3M6.5 17.5l-3-3" />
+                    </svg>
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Create Team
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>

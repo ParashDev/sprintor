@@ -7,7 +7,7 @@ import { SprintBoard } from '@/components/sprint/SprintBoard'
 import { SprintPasswordModal } from '@/components/sprint/SprintPasswordModal'
 import { getSprint } from '@/lib/sprint-service'
 import { validateSprintAccess } from '@/lib/sprint-access-service'
-import type { Sprint } from '@/types/sprint'
+import type { Sprint, TeamMemberRole } from '@/types/sprint'
 
 export default function SprintPage() {
   const params = useParams()
@@ -25,6 +25,10 @@ export default function SprintPage() {
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [participantId, setParticipantId] = useState<string | null>(null)
   const [participantName, setParticipantName] = useState<string | null>(null)
+  // NEW: Use role-based access control
+  const [teamRole, setTeamRole] = useState<TeamMemberRole>('stakeholder')
+  const [isSprintHost, setIsSprintHost] = useState(false)
+  // DEPRECATED: Keep for backward compatibility
   const [accessLevel, setAccessLevel] = useState<'view' | 'contribute' | 'admin'>('view')
 
   // Load sprint data on page load
@@ -55,14 +59,20 @@ export default function SprintPage() {
               sprintId,
               undefined, // No password needed for host
               user.displayName || user.email || 'Host',
-              user.uid // Pass hostId for verification
+              user.uid, // Pass hostId for verification
+              user.email || undefined // Pass email for team member verification
             )
             
-            if (hostAccess.success && hostAccess.accessToken && hostAccess.participantId && hostAccess.accessLevel) {
+            
+            if (hostAccess.success && hostAccess.accessToken && hostAccess.participantId) {
               setAccessToken(hostAccess.accessToken)
               setParticipantId(hostAccess.participantId)
-              setParticipantName(user.displayName || user.email || 'Host')
-              setAccessLevel(hostAccess.accessLevel)
+              setParticipantName(hostAccess.memberName || user.displayName || user.email || 'Host')
+              // NEW: Set role-based access data
+              setTeamRole(hostAccess.teamRole || 'product_owner') // Default to product_owner for hosts
+              setIsSprintHost(true)
+              // DEPRECATED: Keep for backward compatibility
+              setAccessLevel(hostAccess.accessLevel || 'admin')
               return
             }
           } catch (error) {
@@ -90,15 +100,19 @@ export default function SprintPage() {
   const handleAuthSuccess = (authData: {
     accessToken: string
     participantId: string
-    accessLevel: 'view' | 'contribute' | 'admin'
+    teamRole?: TeamMemberRole
+    memberName?: string
+    accessLevel?: 'view' | 'contribute' | 'admin'
   }) => {
     setAccessToken(authData.accessToken)
     setParticipantId(authData.participantId)
-    setAccessLevel(authData.accessLevel)
-    
-    // Get participant name from localStorage or use a default
-    const storedName = localStorage.getItem('sprintor_participant_name') || 'Anonymous'
-    setParticipantName(storedName)
+    // NEW: Set role-based access data
+    setTeamRole(authData.teamRole || 'developer') // Default to developer for password auth
+    setIsSprintHost(false) // Non-host authentication
+    // Use member name from team data or fallback to stored name
+    setParticipantName(authData.memberName || localStorage.getItem('sprintor_participant_name') || 'Anonymous')
+    // DEPRECATED: Keep for backward compatibility
+    setAccessLevel(authData.accessLevel || 'contribute')
     
     setShowPasswordModal(false)
   }
@@ -225,6 +239,11 @@ export default function SprintPage() {
   return (
     <SprintBoard
       sprint={sprint}
+      // NEW: Role-based access control
+      teamRole={teamRole}
+      memberName={participantName || undefined}
+      isSprintHost={isSprintHost}
+      // DEPRECATED: Keep for backward compatibility
       accessLevel={accessLevel}
       participantId={participantId}
       participants={[]} // Simple implementation - no real-time participants for now

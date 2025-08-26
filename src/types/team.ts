@@ -47,6 +47,7 @@ export interface CreateTeamRequest {
   description?: string
   ownerId: string
   ownerName: string
+  ownerEmail?: string // Include owner's email for sprint access verification
   projectId: string
   isPublic: boolean
   defaultRole?: TeamMember['role']

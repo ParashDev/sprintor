@@ -13,24 +13,34 @@ import {
   MoreHorizontal,
   Eye
 } from 'lucide-react'
-import type { SprintStory } from '@/types/sprint'
+import type { SprintStory, TeamMemberRole } from '@/types/sprint'
+import type { SprintPermissions } from '@/lib/sprint-permissions'
 
 interface SprintCardProps {
   story: SprintStory
-  accessLevel: 'view' | 'contribute' | 'admin'
+  // NEW: Use team member role for proper permission handling
+  teamRole?: TeamMemberRole
+  permissions?: SprintPermissions
+  // DEPRECATED: Keep for backward compatibility, now optional
+  accessLevel?: 'view' | 'contribute' | 'admin'
   isDragging: boolean
   isOverlay?: boolean
   onClick?: () => void
 }
 
 export function SprintCard({ 
-  story, 
-  accessLevel, 
+  story,
+  teamRole,
+  permissions, 
+  accessLevel, // DEPRECATED: Keep for backward compatibility
   isDragging, 
   isOverlay = false,
   onClick 
 }: SprintCardProps) {
   const [showDetails, setShowDetails] = useState(false)
+  
+  // NEW: Use role-based permissions with fallback for backward compatibility
+  const canMoveStories = permissions?.canMoveStories ?? (accessLevel !== 'view')
   
   const {
     attributes,
@@ -41,7 +51,7 @@ export function SprintCard({
     isDragging: sortableIsDragging
   } = useSortable({
     id: story.id,
-    disabled: accessLevel === 'view'
+    disabled: !canMoveStories
   })
 
   const style = {
@@ -83,16 +93,16 @@ export function SprintCard({
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...(accessLevel !== 'view' ? listeners : {})}
+      {...(canMoveStories ? listeners : {})}
       onClick={onClick}
       className={`
         group relative bg-white dark:bg-slate-800 rounded-lg border-l-4 shadow-sm
         ${getPriorityColor(story.originalData.priority)}
         ${isDragging || sortableIsDragging ? 'rotate-3 scale-105 shadow-lg z-50' : 'hover:shadow-md'}
-        ${isOverlay ? 'cursor-grabbing' : accessLevel !== 'view' ? 'cursor-grab active:cursor-grabbing touch-manipulation' : 'cursor-pointer'}
+        ${isOverlay ? 'cursor-grabbing' : canMoveStories ? 'cursor-grab active:cursor-grabbing touch-manipulation' : 'cursor-pointer'}
         transition-all duration-200
         ${isCompleted ? 'opacity-75' : ''}
-        ${accessLevel !== 'view' ? 'select-none' : ''}
+        ${canMoveStories ? 'select-none' : ''}
       `}
     >
       {/* Card Header */}
@@ -221,7 +231,7 @@ export function SprintCard({
             )}
 
             {/* More Actions */}
-            {accessLevel !== 'view' && (
+            {(permissions?.canEditStory ?? (accessLevel !== 'view')) && (
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -234,7 +244,7 @@ export function SprintCard({
             )}
 
             {/* View Only Indicator */}
-            {accessLevel === 'view' && (
+            {!canMoveStories && !(permissions?.canEditStory ?? (accessLevel !== 'view')) && (
               <Eye className="w-3 h-3 text-slate-400 dark:text-slate-500" />
             )}
           </div>
@@ -276,7 +286,7 @@ export function SprintCard({
       </div>
 
       {/* Drag Handle Indicator */}
-      {accessLevel !== 'view' && !isOverlay && (
+      {canMoveStories && !isOverlay && (
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-30 transition-opacity">
           <div className="w-1 h-4 bg-slate-400 dark:bg-slate-500 rounded-full"></div>
         </div>

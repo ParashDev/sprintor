@@ -20,8 +20,9 @@ import {
   arrayMove
 } from '@dnd-kit/sortable'
 import { restrictToWindowEdges } from '@dnd-kit/modifiers'
-import type { Sprint, SprintStory, SprintParticipant } from '@/types/sprint'
+import type { Sprint, SprintStory, SprintParticipant, TeamMemberRole } from '@/types/sprint'
 import { updateSprint, subscribeToSprint, completeSprint } from '@/lib/sprint-service'
+import { getSprintPermissions } from '@/lib/sprint-permissions'
 import { SprintCompletionDialog } from './SprintCompletionDialog'
 import { SprintColumn } from './SprintColumn'
 import { SprintCard } from './SprintCard'
@@ -31,21 +32,32 @@ import { AddStoryModal } from './AddStoryModal'
 
 interface SprintBoardProps {
   sprint: Sprint
-  accessLevel: 'view' | 'contribute' | 'admin'
+  // NEW: Use team member role for proper permission handling
+  teamRole: TeamMemberRole
+  // DEPRECATED: Keep for backward compatibility during transition
+  accessLevel?: 'view' | 'contribute' | 'admin'
   participantId: string
   participants: SprintParticipant[]
+  memberName?: string
+  isSprintHost?: boolean  // NEW: Whether user is the sprint creator
   onSprintUpdate?: (sprint: Sprint) => void
   onLeave?: () => void
 }
 
 export function SprintBoard({
   sprint,
-  accessLevel,
+  teamRole,
+  accessLevel, // DEPRECATED: Keep for backward compatibility
   participantId,
   participants,
+  memberName,
+  isSprintHost = false,
   onSprintUpdate,
   onLeave
 }: SprintBoardProps) {
+  // NEW: Get role-based permissions
+  const permissions = getSprintPermissions(teamRole, isSprintHost)
+  
   const [localSprint, setLocalSprint] = useState(sprint)
   const [activeStory, setActiveStory] = useState<SprintStory | null>(null)
   const [showAddStoryModal, setShowAddStoryModal] = useState(false)
@@ -89,7 +101,8 @@ export function SprintBoard({
 
   // Handle drag start
   const handleDragStart = (event: DragStartEvent) => {
-    if (accessLevel === 'view') return
+    // NEW: Use role-based permission check
+    if (!permissions.canMoveStories) return
     
     const { active } = event
     const activeStoryData = currentSprint.stories.find(story => story.id === active.id)
@@ -102,7 +115,8 @@ export function SprintBoard({
 
   // Handle drag over to track which column is being hovered
   const handleDragOver = (event: DragOverEvent) => {
-    if (accessLevel === 'view') return
+    // NEW: Use role-based permission check
+    if (!permissions.canMoveStories) return
 
     const { over } = event
     if (!over) {
@@ -131,7 +145,8 @@ export function SprintBoard({
 
   // Handle drag end
   const handleDragEnd = async (event: DragEndEvent) => {
-    if (accessLevel === 'view') return
+    // NEW: Use role-based permission check
+    if (!permissions.canMoveStories) return
     
     const { active, over } = event
     setActiveStory(null)
@@ -257,7 +272,8 @@ export function SprintBoard({
 
   // Handle starting the sprint
   const handleStartSprint = async () => {
-    if (isStartingSprint || accessLevel !== 'admin') return
+    // NEW: Use role-based permission check
+    if (isStartingSprint || !permissions.canStartSprint) return
     
     try {
       setIsStartingSprint(true)
@@ -280,7 +296,8 @@ export function SprintBoard({
 
   // Handle ending/completing the sprint
   const handleEndSprint = () => {
-    if (accessLevel !== 'admin') return
+    // NEW: Use role-based permission check
+    if (!permissions.canEndSprint) return
     setShowCompletionDialog(true)
   }
 
@@ -326,8 +343,12 @@ export function SprintBoard({
       {/* Sprint Header */}
       <SprintHeader
         sprint={currentSprint}
-        accessLevel={accessLevel}
+        teamRole={teamRole}
+        permissions={permissions}
+        accessLevel={accessLevel} // DEPRECATED: Keep for backward compatibility
         participants={participants}
+        memberName={memberName}
+        isSprintHost={isSprintHost}
         onAddStory={() => setShowAddStoryModal(true)}
         onStartSprint={handleStartSprint}
         onEndSprint={handleEndSprint}
@@ -357,7 +378,9 @@ export function SprintBoard({
                     column={column}
                     stories={storiesByColumn[column.id] || []}
                     metrics={getColumnMetrics(column.id)}
-                    accessLevel={accessLevel}
+                    teamRole={teamRole}
+                    permissions={permissions}
+                    accessLevel={accessLevel || 'view'} // DEPRECATED: Provide fallback for backward compatibility
                     isDraggedOver={dragOverColumn === column.id}
                   />
                 </SortableContext>
@@ -386,6 +409,10 @@ export function SprintBoard({
       {showAddStoryModal && (
         <AddStoryModal
           sprint={currentSprint}
+          teamRole={teamRole}
+          permissions={permissions}
+          memberName={memberName}
+          isSprintHost={isSprintHost}
           isOpen={showAddStoryModal}
           onClose={() => setShowAddStoryModal(false)}
           onStoryAdded={(newStory) => {

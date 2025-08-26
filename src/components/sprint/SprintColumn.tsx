@@ -4,7 +4,8 @@ import React from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Plus, AlertTriangle } from 'lucide-react'
-import type { SprintColumn as SprintColumnType, SprintStory } from '@/types/sprint'
+import type { SprintColumn as SprintColumnType, SprintStory, TeamMemberRole } from '@/types/sprint'
+import type { SprintPermissions } from '@/lib/sprint-permissions'
 import { SprintCard } from './SprintCard'
 
 interface SprintColumnProps {
@@ -15,7 +16,11 @@ interface SprintColumnProps {
     storyPoints: number
     isOverWipLimit: boolean
   }
-  accessLevel: 'view' | 'contribute' | 'admin'
+  // NEW: Use team member role for proper permission handling
+  teamRole?: TeamMemberRole
+  permissions?: SprintPermissions
+  // DEPRECATED: Keep for backward compatibility, now optional
+  accessLevel?: 'view' | 'contribute' | 'admin'
   isDraggedOver: boolean
   onAddStory?: () => void
 }
@@ -24,7 +29,9 @@ export function SprintColumn({
   column,
   stories,
   metrics,
-  accessLevel,
+  teamRole,
+  permissions,
+  accessLevel, // DEPRECATED: Keep for backward compatibility
   isDraggedOver,
   onAddStory
 }: SprintColumnProps) {
@@ -32,7 +39,10 @@ export function SprintColumn({
     id: column.id
   })
 
-  const canAddStories = accessLevel !== 'view' && (column.status === 'todo' || accessLevel === 'admin')
+  // NEW: Use role-based permissions with fallback to old logic for backward compatibility
+  const canAddStories = permissions 
+    ? permissions.canCreateStory && (column.status === 'todo' || permissions.canEditStory)
+    : (accessLevel !== 'view' && (column.status === 'todo' || accessLevel === 'admin'))
 
   return (
     <div
@@ -103,7 +113,9 @@ export function SprintColumn({
               <SprintCard
                 key={story.id}
                 story={story}
-                accessLevel={accessLevel}
+                teamRole={teamRole}
+                permissions={permissions}
+                accessLevel={accessLevel || 'view'} // DEPRECATED: Provide fallback for backward compatibility
                 isDragging={false}
               />
             ))}

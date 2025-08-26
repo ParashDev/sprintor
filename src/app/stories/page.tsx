@@ -751,10 +751,7 @@ function StoriesContent() {
     
     if (!targetStory || targetStory.status === newStatus) return
 
-    // Prevent dragging from completed status unless unlocked
-    if (targetStory.status === 'completed' && !unlockedCompletedStories.has(storyId)) {
-      return
-    }
+    // This check is already handled by useSortable disabled property - no need to block drop here
 
     // Auto-lock story if moving out of completed status
     if (targetStory.status === 'completed' && unlockedCompletedStories.has(storyId)) {

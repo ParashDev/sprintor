@@ -118,12 +118,17 @@ export interface SprintMember {
   id: string
   name: string
   email?: string
-  role: 'host' | 'member' | 'viewer'
+  // NEW: Use actual team member roles instead of generic roles
+  teamRole: TeamMemberRole
+  // DEPRECATED: Keep for backward compatibility during transition
+  role?: 'host' | 'member' | 'viewer'
   avatar?: string
   capacity?: number       // Hours per day available
   joinedAt: Date
   lastSeen: Date
   isOnline: boolean
+  // NEW: Permission flags derived from team role
+  isHost?: boolean        // True if sprint creator
 }
 
 export interface SprintParticipant {
@@ -214,15 +219,23 @@ export interface SprintMetrics {
 }
 
 // Access Control Types
+export type TeamMemberRole = 'product_owner' | 'scrum_master' | 'business_analyst' | 'developer' | 'tester' | 'stakeholder'
+
 export interface SprintAccess {
   sprintId: string
   participantId: string
-  accessLevel: 'view' | 'contribute' | 'admin'
+  // NEW: Use actual team member roles instead of generic access levels
+  teamRole: TeamMemberRole
+  // DEPRECATED: Keep for backward compatibility, will be removed
+  accessLevel?: 'view' | 'contribute' | 'admin'
   passwordRequired: boolean
   sessionToken?: string           // For password-verified sessions
   expiresAt?: Date
   grantedAt: Date
   grantedBy: string
+  // NEW: User identification from team membership (optional - may not be provided)
+  memberEmail?: string | undefined
+  memberName?: string | undefined
 }
 
 // Real-time Collaboration Types
