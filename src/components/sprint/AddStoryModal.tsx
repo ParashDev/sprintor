@@ -205,7 +205,7 @@ export function AddStoryModal({
               placeholder="Search stories by title, description, or labels..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-gray-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -214,7 +214,7 @@ export function AddStoryModal({
         <div className="flex-1 overflow-y-auto max-h-96">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600"></div>
             </div>
           ) : filteredStories.length === 0 ? (
             <div className="text-center py-12">
@@ -240,7 +240,7 @@ export function AddStoryModal({
                       className={`
                         p-4 rounded-lg border-2 cursor-pointer transition-all
                         ${isSelected 
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
+                          ? 'border-gray-500 bg-gray-50 dark:bg-gray-800/50' 
                           : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'
                         }
                       `}
@@ -253,7 +253,7 @@ export function AddStoryModal({
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => handleStoryToggle(story.id)}
-                              className="rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500"
+                              className="rounded border-slate-300 dark:border-slate-600 text-gray-600 focus:ring-gray-500"
                               onClick={(e) => e.stopPropagation()}
                             />
                             <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -261,20 +261,20 @@ export function AddStoryModal({
                             </span>
                             <span className={`
                               px-2 py-0.5 rounded-full text-xs font-medium
-                              ${story.type === 'story' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
-                                story.type === 'bug' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
-                                story.type === 'task' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
-                                'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                              ${story.type === 'story' ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' :
+                                story.type === 'bug' ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' :
+                                story.type === 'task' ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' :
+                                'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
                               }
                             `}>
                               {story.type}
                             </span>
                             <span className={`
                               px-2 py-0.5 rounded-full text-xs font-medium
-                              ${story.priority === 'Must Have' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
-                                story.priority === 'Should Have' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
-                                story.priority === 'Could Have' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
-                                'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300'
+                              ${story.priority === 'Must Have' ? 'bg-gray-800 text-gray-100 dark:bg-gray-200 dark:text-gray-800' :
+                                story.priority === 'Should Have' ? 'bg-gray-600 text-gray-100 dark:bg-gray-300 dark:text-gray-800' :
+                                story.priority === 'Could Have' ? 'bg-gray-400 text-gray-100 dark:bg-gray-400 dark:text-gray-100' :
+                                'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
                               }
                             `}>
                               {story.priority}
@@ -344,7 +344,7 @@ export function AddStoryModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-750 border-t border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between p-6 bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
           <div className="text-sm text-slate-600 dark:text-slate-400">
             {selectedStories.length > 0 
               ? `${selectedStories.length} ${selectedStories.length === 1 ? 'story' : 'stories'} selected`
@@ -362,7 +362,7 @@ export function AddStoryModal({
             <button
               onClick={handleAddStories}
               disabled={selectedStories.length === 0 || isAddingStories}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-700 dark:bg-gray-100 dark:hover:bg-gray-300 disabled:bg-slate-400 disabled:cursor-not-allowed text-white dark:text-gray-900 rounded-lg transition-colors"
             >
               {isAddingStories ? (
                 <>

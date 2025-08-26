@@ -11,7 +11,12 @@ import {
   CheckCircle2,
   Circle,
   MoreHorizontal,
-  Eye
+  Eye,
+  Bug,
+  Zap,
+  FileText,
+  Book,
+  CheckCircle
 } from 'lucide-react'
 import type { SprintStory, TeamMemberRole } from '@/types/sprint'
 import type { SprintPermissions } from '@/lib/sprint-permissions'
@@ -60,25 +65,20 @@ export function SprintCard({
     zIndex: sortableIsDragging ? 1000 : 1
   }
 
-  // Get priority color
+  // Get priority indicator (just returns empty string now since we removed left border)
   const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'Must Have': return 'border-red-500 bg-red-50 dark:bg-red-900/20'
-      case 'Should Have': return 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
-      case 'Could Have': return 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-      case "Won't Have": return 'border-gray-500 bg-gray-50 dark:bg-gray-900/20'
-      default: return 'border-slate-300 bg-white dark:bg-slate-800'
-    }
+    return '' // No special coloring, just use regular card styling
   }
 
-  // Get story type icon and color
+  // Get story type icon component and color
   const getTypeDisplay = (type: string) => {
+    const iconProps = { className: "w-4 h-4" }
     switch (type) {
-      case 'story': return { icon: '📖', color: 'text-blue-600 dark:text-blue-400' }
-      case 'bug': return { icon: '🐛', color: 'text-red-600 dark:text-red-400' }
-      case 'task': return { icon: '✅', color: 'text-green-600 dark:text-green-400' }
-      case 'spike': return { icon: '⚡', color: 'text-purple-600 dark:text-purple-400' }
-      default: return { icon: '📄', color: 'text-slate-600 dark:text-slate-400' }
+      case 'story': return { icon: <Book {...iconProps} />, color: 'text-muted-foreground' }
+      case 'bug': return { icon: <Bug {...iconProps} />, color: 'text-muted-foreground' }
+      case 'task': return { icon: <CheckCircle {...iconProps} />, color: 'text-muted-foreground' }
+      case 'spike': return { icon: <Zap {...iconProps} />, color: 'text-muted-foreground' }
+      default: return { icon: <FileText {...iconProps} />, color: 'text-muted-foreground' }
     }
   }
 
@@ -96,7 +96,7 @@ export function SprintCard({
       {...(canMoveStories ? listeners : {})}
       onClick={onClick}
       className={`
-        group relative bg-white dark:bg-slate-800 rounded-lg border-l-4 shadow-sm
+        group relative bg-card rounded-lg border border-border shadow-sm
         ${getPriorityColor(story.originalData.priority)}
         ${isDragging || sortableIsDragging ? 'rotate-3 scale-105 shadow-lg z-50' : 'hover:shadow-md'}
         ${isOverlay ? 'cursor-grabbing' : canMoveStories ? 'cursor-grab active:cursor-grabbing touch-manipulation' : 'cursor-pointer'}
@@ -111,11 +111,11 @@ export function SprintCard({
           <div className="flex-1 min-w-0">
             {/* Story Type and ID */}
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm">{typeDisplay.icon}</span>
+              <span className={typeDisplay.color}>{typeDisplay.icon}</span>
               <span className={`text-xs font-medium ${typeDisplay.color}`}>
                 {story.originalData.type.toUpperCase()}
               </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400">
+              <span className="text-xs text-muted-foreground">
                 #{story.originalStoryId?.slice(-6)}
               </span>
             </div>
@@ -132,13 +132,13 @@ export function SprintCard({
           {/* Status Icons */}
           <div className="flex items-center gap-1 ml-2">
             {isCompleted && (
-              <CheckCircle2 className="w-4 h-4 text-green-500 dark:text-green-400" />
+              <CheckCircle2 className="w-4 h-4 text-gray-700 dark:text-gray-300" />
             )}
             {isInProgress && (
-              <Circle className="w-4 h-4 text-orange-500 dark:text-orange-400" />
+              <Circle className="w-4 h-4 text-gray-600 dark:text-gray-400" />
             )}
             {hasBlockers && (
-              <AlertTriangle className="w-4 h-4 text-red-500 dark:text-red-400" />
+              <AlertTriangle className="w-4 h-4 text-gray-700 dark:text-gray-300" />
             )}
           </div>
         </div>
@@ -158,13 +158,13 @@ export function SprintCard({
             {story.originalData.labels.slice(0, 3).map(label => (
               <span
                 key={label}
-                className="px-2 py-0.5 text-xs rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
+                className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground"
               >
                 {label}
               </span>
             ))}
             {story.originalData.labels.length > 3 && (
-              <span className="px-2 py-0.5 text-xs rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-500">
+              <span className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">
                 +{story.originalData.labels.length - 3}
               </span>
             )}
@@ -175,9 +175,9 @@ export function SprintCard({
       {/* Progress Bar */}
       {story.progress > 0 && story.progress < 100 && (
         <div className="px-3 pb-2">
-          <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5">
+          <div className="w-full bg-muted rounded-full h-1.5">
             <div
-              className="bg-blue-500 dark:bg-blue-400 h-1.5 rounded-full transition-all duration-300"
+              className="bg-primary h-1.5 rounded-full transition-all duration-300"
               style={{ width: `${story.progress}%` }}
             />
           </div>
@@ -188,14 +188,14 @@ export function SprintCard({
       )}
 
       {/* Card Footer */}
-      <div className="px-3 py-2 bg-slate-50 dark:bg-slate-750 rounded-b-lg border-t border-slate-100 dark:border-slate-700">
+      <div className="px-3 py-2 bg-muted rounded-b-lg border-t border-border">
         <div className="flex items-center justify-between">
           {/* Left side - Story Points and Assignment */}
           <div className="flex items-center gap-2">
             {/* Story Points */}
             {story.storyPoints && (
               <div className="flex items-center gap-1">
-                <div className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 flex items-center justify-center text-xs font-medium">
+                <div className="w-5 h-5 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-medium">
                   {story.storyPoints}
                 </div>
               </div>
@@ -237,7 +237,7 @@ export function SprintCard({
                   e.stopPropagation()
                   setShowDetails(!showDetails)
                 }}
-                className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-300 dark:hover:bg-slate-600 transition-colors opacity-0 group-hover:opacity-100"
+                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors opacity-0 group-hover:opacity-100"
               >
                 <MoreHorizontal className="w-3 h-3" />
               </button>
@@ -271,7 +271,7 @@ export function SprintCard({
             {/* Blockers */}
             {hasBlockers && (
               <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-600">
-                <div className="text-xs text-red-600 dark:text-red-400 font-medium mb-1">
+                <div className="text-xs text-gray-700 dark:text-gray-300 font-medium mb-1">
                   Blockers:
                 </div>
                 {story.blockers.slice(0, 2).map(blocker => (
@@ -288,7 +288,7 @@ export function SprintCard({
       {/* Drag Handle Indicator */}
       {canMoveStories && !isOverlay && (
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-30 transition-opacity">
-          <div className="w-1 h-4 bg-slate-400 dark:bg-slate-500 rounded-full"></div>
+          <div className="w-1 h-4 bg-muted-foreground rounded-full"></div>
         </div>
       )}
     </div>

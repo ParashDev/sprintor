@@ -339,7 +339,7 @@ export function SprintBoard({
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
+    <div className="h-screen bg-background flex flex-col">
       {/* Sprint Header */}
       <SprintHeader
         sprint={currentSprint}
@@ -437,11 +437,11 @@ export function SprintBoard({
 
       {/* Sprint Statistics Overlay (when dragging) */}
       {isDragging && (
-        <div className="fixed bottom-4 right-4 bg-white dark:bg-slate-800 rounded-lg shadow-lg p-4 border border-slate-200 dark:border-slate-700">
-          <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-2">
+        <div className="fixed bottom-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 border border-gray-200 dark:border-gray-700">
+          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
             Sprint Overview
           </h3>
-          <div className="grid grid-cols-2 gap-4 text-xs text-slate-600 dark:text-slate-400">
+          <div className="grid grid-cols-2 gap-4 text-xs text-gray-600 dark:text-gray-400">
             <div>
               <div className="font-medium">Stories</div>
               <div>{currentSprint.stories.length} total</div>

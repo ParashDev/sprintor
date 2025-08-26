@@ -85,6 +85,20 @@ export default function CreateStoryModal({
 }: CreateStoryModalProps) {
   const [lockedProjectId, setLockedProjectId] = useState<string>('')
   const { user } = useAuth()
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = 'unset'
+    }
+
+    // Cleanup on unmount
+    return () => {
+      document.body.style.overflow = 'unset'
+    }
+  }, [isOpen])
   
   // Template state
   const [templates, setTemplates] = useState<StoryTemplate[]>([])
@@ -467,12 +481,12 @@ export default function CreateStoryModal({
       />
       
       {/* Modal */}
-      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden border">
+      <div className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+        <div className="px-6 py-4 border-b bg-muted">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-xl font-semibold text-foreground">
                 {isEditing 
                   ? "Edit Story" 
                   : currentStep === "template" 
@@ -480,7 +494,7 @@ export default function CreateStoryModal({
                     : "Create Story"
                 }
               </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 {isEditing
                   ? `Editing: ${editingStory?.title}`
                   : sessionMode
@@ -502,10 +516,10 @@ export default function CreateStoryModal({
           {currentStep === "template" && !isEditing && (
             <div className="h-full flex flex-col">
               {/* Search & Filters */}
-              <div className="p-6 border-b bg-gray-50/50 dark:bg-gray-800/50">
+              <div className="p-6 border-b bg-muted/50">
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Search templates..."
                       value={templateSearch}
@@ -531,7 +545,7 @@ export default function CreateStoryModal({
                   {/* Epic Assignment Display */}
                   <div className="w-full sm:flex-1">
                     <Label className="text-sm font-medium">Epic for this Story</Label>
-                    <div className="mt-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-input">
+                    <div className="mt-1 px-3 py-2 bg-muted rounded-md border border-input">
                       {loadingEpics ? (
                         <span className="text-sm text-muted-foreground">Loading epics...</span>
                       ) : selectedEpicId === "no-epic" ? (
@@ -578,23 +592,23 @@ export default function CreateStoryModal({
               </div>
 
               {/* Template Grid */}
-              <ScrollArea className="h-[60vh] p-6">
+              <ScrollArea className="h-[50vh] sm:h-[60vh] p-6">
                 {loadingTemplates ? (
                   <div className="flex items-center justify-center py-12">
-                    <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-8 lg:pb-4">
                     {filteredTemplates.map((template) => (
                       <Card 
                         key={template.id} 
-                        className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:border-blue-300"
+                        className="cursor-pointer hover:shadow-lg transition-all duration-200 hover:border-ring"
                         onClick={() => handleTemplateSelect(template)}
                       >
                         <CardHeader className="pb-3">
                           <div className="flex items-start justify-between">
                             <div className="flex items-center gap-3">
-                              <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                              <div className="p-2 bg-muted rounded-md">
                                 {getTypeIcon(template.category)}
                               </div>
                               <div>
@@ -625,7 +639,7 @@ export default function CreateStoryModal({
                               </Badge>
                             )}
                           </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 p-3 rounded">
+                          <div className="text-sm text-muted-foreground bg-muted p-3 rounded">
                             As a <strong>{template.asA}</strong>, I want {template.iWant}
                           </div>
                         </CardContent>
@@ -641,7 +655,7 @@ export default function CreateStoryModal({
             <div className="h-full flex flex-col">
               {/* Back Navigation - only show for creating, not editing */}
               {!isEditing && (
-                <div className="px-6 py-3 border-b bg-gray-50/50 dark:bg-gray-800/50">
+                <div className="px-6 py-3 border-b bg-muted/50">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -657,7 +671,7 @@ export default function CreateStoryModal({
               <ScrollArea className="h-[60vh] p-6">
                 <div className="max-w-4xl mx-auto space-y-8">
                   {/* Basic Info */}
-                  <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                  <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                     <h3 className="text-lg font-medium">Basic Information</h3>
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                       <div className="lg:col-span-2">
@@ -702,7 +716,7 @@ export default function CreateStoryModal({
                       </div>
                       <div>
                         <Label>Selected Epic</Label>
-                        <div className="mt-1 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-md border border-input">
+                        <div className="mt-1 px-3 py-2 bg-muted rounded-md border border-input">
                           {selectedEpicId === "no-epic" ? (
                             <span className="text-sm text-muted-foreground">No Epic Selected</span>
                           ) : (
@@ -749,7 +763,7 @@ export default function CreateStoryModal({
 
                   {/* User Story Format */}
                   {selectData.type === "story" && (
-                    <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                    <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                       <h3 className="text-lg font-medium">User Story Format</h3>
                       <div className="grid gap-4">
                         <div>
@@ -792,7 +806,7 @@ export default function CreateStoryModal({
                   {/* Business & Estimation */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Business Details */}
-                    <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                    <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                       <h3 className="text-lg font-medium">Business Details</h3>
                       <div className="space-y-4">
                         <div>
@@ -845,7 +859,7 @@ export default function CreateStoryModal({
                     </div>
 
                     {/* Estimation */}
-                    <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                    <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                       <h3 className="text-lg font-medium">Estimation</h3>
                       <div className="space-y-4">
                         <div>
@@ -891,7 +905,7 @@ export default function CreateStoryModal({
                   </div>
 
                   {/* Acceptance Criteria */}
-                  <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                  <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-medium">Acceptance Criteria</h3>
                       <Button type="button" variant="outline" size="sm" onClick={handleAddAcceptanceCriterion}>
@@ -901,8 +915,8 @@ export default function CreateStoryModal({
                     </div>
                     <div className="space-y-3">
                       {acceptanceCriteria.map((criteria, index) => (
-                        <div key={index} className="flex items-start gap-3 p-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-sm">
-                          <span className="text-sm text-gray-500 mt-1">{index + 1}.</span>
+                        <div key={index} className="flex items-start gap-3 p-3 bg-card border border-border rounded-lg shadow-sm">
+                          <span className="text-sm text-muted-foreground mt-1">{index + 1}.</span>
                           <span className="flex-1 text-sm">{criteria}</span>
                           <Button
                             type="button"
@@ -940,7 +954,7 @@ export default function CreateStoryModal({
                   </div>
 
                   {/* Labels */}
-                  <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                  <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-medium">Labels</h3>
                       <Button type="button" variant="outline" size="sm" onClick={handleAddLabel}>
@@ -949,11 +963,11 @@ export default function CreateStoryModal({
                       </Button>
                     </div>
                     <div className="space-y-3">
-                      <div className="flex flex-wrap gap-2 p-3 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg shadow-sm min-h-[3rem]">
+                      <div className="flex flex-wrap gap-2 p-3 bg-card border border-border rounded-lg shadow-sm min-h-[3rem]">
                         {labels.map((label) => (
                           <div 
                             key={label} 
-                            className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-150 bg-white dark:bg-gray-700 text-black dark:text-white border border-gray-200 dark:border-gray-600 rounded px-3 py-1 text-sm flex items-center gap-1 flex-shrink-0 whitespace-nowrap"
+                            className="cursor-pointer hover:bg-accent transition-all duration-150 bg-muted text-foreground border border-border rounded px-3 py-1 text-sm flex items-center gap-1 flex-shrink-0 whitespace-nowrap"
                             onClick={() => handleRemoveLabel(label)}
                           >
                             {label}
@@ -961,7 +975,7 @@ export default function CreateStoryModal({
                           </div>
                         ))}
                         {labels.length === 0 && (
-                          <span className="text-sm text-gray-400 flex items-center">No labels added yet</span>
+                          <span className="text-sm text-muted-foreground flex items-center">No labels added yet</span>
                         )}
                       </div>
                       
@@ -995,7 +1009,7 @@ export default function CreateStoryModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t bg-gray-50 dark:bg-gray-800">
+        <div className="px-6 py-4 border-t bg-muted">
           {currentStep === "template" ? (
             <div className="flex justify-end">
               <Button variant="outline" onClick={handleClose}>
@@ -1004,7 +1018,7 @@ export default function CreateStoryModal({
             </div>
           ) : (
             <div className="flex justify-between items-center">
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-muted-foreground">
                 Fields marked with * are required
               </div>
               <div className="flex gap-3">

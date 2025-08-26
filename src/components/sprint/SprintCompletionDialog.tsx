@@ -128,7 +128,7 @@ export function SprintCompletionDialog({
             <div className="grid grid-cols-2 gap-4">
             <div className="p-4 border rounded-lg">
               <div className="flex items-center gap-2 mb-2">
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <CheckCircle2 className="w-5 h-5 text-gray-700 dark:text-gray-300" />
                 <span className="font-medium">Completed</span>
               </div>
               <div className="text-2xl font-bold">{completedStories.length}</div>
@@ -139,7 +139,7 @@ export function SprintCompletionDialog({
             
             <div className="p-4 border rounded-lg">
               <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                <AlertTriangle className="w-5 h-5 text-gray-700 dark:text-gray-300" />
                 <span className="font-medium">Incomplete</span>
               </div>
               <div className="text-2xl font-bold">{incompleteStories.length}</div>
@@ -157,7 +157,7 @@ export function SprintCompletionDialog({
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
-                className="bg-green-600 h-2 rounded-full transition-all"
+                className="bg-gray-900 dark:bg-gray-100 h-2 rounded-full transition-all"
                 style={{ width: `${completionRate}%` }}
               />
             </div>
@@ -166,8 +166,8 @@ export function SprintCompletionDialog({
           {/* Incomplete Stories Warning with Notes */}
           {incompleteStories.length > 0 && (
             <div className="space-y-4">
-              <Alert className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-900/20">
-                <AlertTriangle className="h-4 w-4 text-yellow-600" />
+              <Alert className="border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
+                <AlertTriangle className="h-4 w-4 text-gray-700 dark:text-gray-300" />
                 <AlertDescription>
                   <strong>{incompleteStories.length} incomplete {incompleteStories.length === 1 ? 'story' : 'stories'}</strong> will be returned to the backlog for re-grooming.
                 </AlertDescription>
@@ -177,10 +177,10 @@ export function SprintCompletionDialog({
               <div className="bg-muted/50 border border-border rounded-lg p-3 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-medium flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-yellow-600" />
-                    Story-Specific Notes <span className="text-red-500">*</span>
+                    <AlertTriangle className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+                    Story-Specific Notes <span className="text-gray-700 dark:text-gray-300">*</span>
                   </h4>
-                  <span className="text-xs text-muted-foreground bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 rounded">
+                  <span className="text-xs text-muted-foreground bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
                     Required for incomplete stories
                   </span>
                 </div>
@@ -193,7 +193,7 @@ export function SprintCompletionDialog({
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                            <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                            <div className="w-3 h-3 rounded-full bg-gray-400 dark:bg-gray-500"></div>
                             <p className="text-sm font-medium">{story.title}</p>
                           </div>
                           <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -201,7 +201,7 @@ export function SprintCompletionDialog({
                               Status: {story.sprintStatus?.replace('_', ' ').toUpperCase()}
                             </span>
                             {story.storyPoints && (
-                              <span className="bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded">
+                              <span className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
                                 {story.storyPoints} points
                               </span>
                             )}
@@ -210,7 +210,7 @@ export function SprintCompletionDialog({
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground mb-1 block">
-                          Why wasn&apos;t this story completed? <span className="text-red-500">*</span>
+                          Why wasn&apos;t this story completed? <span className="text-gray-700 dark:text-gray-300">*</span>
                         </Label>
                         <Textarea
                           placeholder="e.g., Blocked by dependencies, technical complexity underestimated, requirements changed, external API issues..."
@@ -279,7 +279,7 @@ export function SprintCompletionDialog({
         <div className="px-6 py-4 border-t shrink-0 bg-background">
           {/* Validation message */}
           {incompleteStories.length > 0 && !allIncompleteStoriesHaveNotes && (
-            <div className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-sm text-yellow-700 dark:text-yellow-300">
+            <div className="mb-3 p-2 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded text-sm text-gray-700 dark:text-gray-300">
               <AlertTriangle className="w-4 h-4 inline mr-2" />
               Please provide reasons for all incomplete stories before completing the sprint.
             </div>

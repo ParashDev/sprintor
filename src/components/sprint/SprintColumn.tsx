@@ -48,15 +48,15 @@ export function SprintColumn({
     <div
       ref={setNodeRef}
       className={`
-        w-72 sm:w-80 h-full bg-white dark:bg-slate-800 rounded-xl shadow-sm transition-all duration-200 flex flex-col
+        w-72 sm:w-80 h-full bg-card rounded-xl shadow-sm transition-all duration-200 flex flex-col
         ${isDraggedOver 
-          ? 'border-2 border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/50 dark:bg-blue-900/20' 
-          : 'border border-slate-200 dark:border-slate-700'
+          ? 'border-2 border-primary ring-2 ring-primary/20 bg-accent' 
+          : 'border border-border'
         }
       `}
     >
       {/* Column Header */}
-      <div className="p-3 sm:p-4 border-b border-slate-200 dark:border-slate-700">
+      <div className="p-3 sm:p-4 border-b border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* Column Color Indicator */}
@@ -66,12 +66,12 @@ export function SprintColumn({
             />
             
             {/* Column Title */}
-            <h3 className="text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+            <h3 className="text-xs sm:text-sm font-medium text-card-foreground truncate">
               {column.name}
             </h3>
             
             {/* Story Count Badge */}
-            <div className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
+            <div className="px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
               {metrics.storyCount}
             </div>
           </div>
@@ -80,7 +80,7 @@ export function SprintColumn({
           {canAddStories && (
             <button
               onClick={onAddStory}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:text-slate-300 dark:hover:bg-slate-700 transition-colors"
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               title={`Add story to ${column.name}`}
             >
               <Plus className="w-4 h-4" />
@@ -89,7 +89,7 @@ export function SprintColumn({
         </div>
 
         {/* Column Metrics */}
-        <div className="mt-2 flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+        <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
           <div className="flex items-center gap-1">
             <span>{metrics.storyPoints} points</span>
           </div>
@@ -101,7 +101,7 @@ export function SprintColumn({
         {/* Visual Drop Indicator when hovering */}
         {isDraggedOver && (
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
-            <div className="bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-lg">
+            <div className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium shadow-lg">
               Drop story here
             </div>
           </div>
@@ -123,14 +123,14 @@ export function SprintColumn({
           
           {/* Empty State Only */}
           {stories.length === 0 && (
-            <div className="flex items-center justify-center h-full text-center py-16 text-slate-400 dark:text-slate-500">
+            <div className="flex items-center justify-center h-full text-center py-16 text-muted-foreground">
               <div>
                 <div className="text-sm mb-2">No stories in {column.name.toLowerCase()}</div>
-                <div className="text-xs text-slate-300 dark:text-slate-600 mb-3">Drag stories here</div>
+                <div className="text-xs text-muted-foreground/60 mb-3">Drag stories here</div>
                 {canAddStories && (
                   <button
                     onClick={onAddStory}
-                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                    className="text-xs text-foreground hover:underline"
                   >
                     Add your first story
                   </button>
@@ -143,8 +143,8 @@ export function SprintColumn({
 
       {/* Column Footer - Only show completion for done column */}
       {column.status === 'done' && metrics.storyCount > 0 && (
-        <div className="px-3 sm:px-4 py-2 bg-slate-50 dark:bg-slate-750 rounded-b-xl border-t border-slate-200 dark:border-slate-700">
-          <div className="flex justify-center items-center text-xs text-green-600 dark:text-green-400">
+        <div className="px-3 sm:px-4 py-2 bg-muted rounded-b-xl border-t border-border">
+          <div className="flex justify-center items-center text-xs text-foreground">
             ✓ {metrics.storyCount} completed
           </div>
         </div>

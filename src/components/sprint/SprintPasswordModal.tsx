@@ -168,8 +168,8 @@ export function SprintPasswordModal({
       >
         {/* Header */}
         <div className="p-6 pb-4">
-          <div className="flex items-center justify-center w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full mx-auto mb-4">
-            <Lock className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+          <div className="flex items-center justify-center w-12 h-12 bg-gray-100 dark:bg-gray-800 rounded-full mx-auto mb-4">
+            <Lock className="w-6 h-6 text-gray-700 dark:text-gray-300" />
           </div>
           
           <div className="text-center">
@@ -184,17 +184,17 @@ export function SprintPasswordModal({
 
         {/* Sprint Info */}
         <div className="px-6 pb-4">
-          <div className="bg-slate-50 dark:bg-slate-750 rounded-lg p-4">
+          <div className="bg-slate-50 dark:bg-slate-800 rounded-lg p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-medium text-slate-900 dark:text-slate-100">
                 {sprint.name}
               </h3>
               <span className={`
                 px-2 py-0.5 rounded-full text-xs font-medium
-                ${sprint.status === 'active' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                ${sprint.status === 'active' ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' :
                   sprint.status === 'draft' ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' :
-                  sprint.status === 'completed' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
-                  'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                  sprint.status === 'completed' ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' :
+                  'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
                 }
               `}>
                 {sprint.status.charAt(0).toUpperCase() + sprint.status.slice(1)}
@@ -247,7 +247,7 @@ export function SprintPasswordModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter your name"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-gray-500 focus:border-transparent"
                 disabled={isLoading}
                 maxLength={50}
                 required
@@ -269,7 +269,7 @@ export function SprintPasswordModal({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your.email@company.com"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-gray-500 focus:border-transparent"
                 disabled={isLoading}
                 required
               />
@@ -294,7 +294,7 @@ export function SprintPasswordModal({
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter sprint password"
-                  className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 placeholder-slate-500 dark:placeholder-slate-400 focus:ring-2 focus:ring-gray-500 focus:border-transparent"
                   disabled={isLoading}
                   required
                 />
@@ -316,14 +316,14 @@ export function SprintPasswordModal({
 
           {/* Error Message */}
           {error && (
-            <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+            <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+              <p className="text-sm text-gray-700 dark:text-gray-300">{error}</p>
             </div>
           )}
 
           {/* Access Level Info */}
-          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-sm text-blue-700 dark:text-blue-300">
+          <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
               <Users className="w-4 h-4 inline mr-1" />
               Only registered team members can access this sprint board
             </p>
@@ -342,7 +342,7 @@ export function SprintPasswordModal({
             <button
               type="submit"
               disabled={isLoading || !name.trim() || !email.trim() || !password.trim()}
-              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2 bg-gray-900 hover:bg-gray-700 dark:bg-gray-100 dark:hover:bg-gray-300 disabled:bg-slate-400 disabled:cursor-not-allowed text-white dark:text-gray-900 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>
@@ -357,7 +357,7 @@ export function SprintPasswordModal({
         </form>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-750 rounded-b-xl border-t border-slate-200 dark:border-slate-700">
+        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800 rounded-b-xl border-t border-slate-200 dark:border-slate-700">
           <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
             Access restricted to project team members only. Contact your team lead if you need access.
           </p>

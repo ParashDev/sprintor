@@ -77,6 +77,7 @@ import CreateStoryModal from "@/components/stories/CreateStoryModal"
 import {
   DndContext,
   DragEndEvent,
+  DragOverEvent,
   DragOverlay,
   DragStartEvent,
   PointerSensor,
@@ -103,10 +104,10 @@ interface Project {
 
 // Kanban columns configuration - Complete story lifecycle
 const KANBAN_COLUMNS = [
-  { id: 'backlog', title: 'Backlog', color: 'bg-gray-100 dark:bg-gray-800' },
-  { id: 'planning', title: 'Planning', color: 'bg-blue-100 dark:bg-blue-900/20' },
-  { id: 'sprint_ready', title: 'Sprint Ready', color: 'bg-green-100 dark:bg-green-900/20' },
-  { id: 'completed', title: 'Completed', color: 'bg-purple-100 dark:bg-purple-900/20' }
+  { id: 'backlog', title: 'Backlog', color: 'bg-muted' },
+  { id: 'planning', title: 'Planning', color: 'bg-muted' },
+  { id: 'sprint_ready', title: 'Sprint Ready', color: 'bg-muted' },
+  { id: 'completed', title: 'Completed', color: 'bg-muted' }
 ]
 
 // Memoized content component (prevents re-renders during drag)
@@ -142,11 +143,11 @@ const StoryCardContent = React.memo(function StoryCardContent({
 
   const getPriorityColor = useCallback((priority: string) => {
     switch (priority) {
-      case 'Must Have': return 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300'
-      case 'Should Have': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300'
-      case 'Could Have': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300'
-      case 'Won\'t Have': return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-      default: return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300'
+      case 'Must Have': return 'bg-muted text-muted-foreground border-muted'
+      case 'Should Have': return 'bg-muted text-muted-foreground border-muted'
+      case 'Could Have': return 'bg-muted text-muted-foreground border-muted'
+      case 'Won\'t Have': return 'bg-muted text-muted-foreground border-muted'
+      default: return 'bg-muted text-muted-foreground border-muted'
     }
   }, [])
 
@@ -277,7 +278,7 @@ const StoryCard = function StoryCard({
     <div
       ref={setNodeRef}
       style={{...style, touchAction: canDrag ? 'none' : 'auto'}}
-      className={`bg-white dark:bg-gray-800 border rounded-lg p-3 mb-3 shadow-sm relative ${
+      className={`bg-card border border-border rounded-lg p-3 mb-3 shadow-sm relative ${
         isCompleted && !isUnlocked
           ? 'opacity-75' // Slightly faded for locked completed stories
           : isCompleted && isUnlocked 
@@ -310,12 +311,13 @@ interface DroppableColumnProps {
   onViewDetails: (story: Story) => void
   isDeleting: boolean
   deletingStoryId: string
+  isDraggedOver: boolean
   onUnlock?: (storyId: string) => void
   onLock?: (storyId: string) => void
   unlockedStories?: Set<string>
 }
 
-const DroppableColumn = React.memo(function DroppableColumn({ column, stories, onEdit, onDelete, onViewDetails, isDeleting, deletingStoryId, onUnlock, onLock, unlockedStories }: DroppableColumnProps) {
+const DroppableColumn = React.memo(function DroppableColumn({ column, stories, onEdit, onDelete, onViewDetails, isDeleting, deletingStoryId, isDraggedOver, onUnlock, onLock, unlockedStories }: DroppableColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
   })
@@ -341,10 +343,19 @@ const DroppableColumn = React.memo(function DroppableColumn({ column, stories, o
           >
             <div
               ref={setNodeRef}
-              className={`min-h-[200px] space-y-3 ${
+              className={`min-h-[200px] space-y-3 relative ${
                 isOver ? 'bg-accent/50 rounded-lg' : ''
               }`}
             >
+              {/* Visual Drop Indicator - Always show when dragging over (like sprint board) */}
+              {(isOver || isDraggedOver) && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-50">
+                  <div className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium shadow-lg">
+                    Drop story here
+                  </div>
+                </div>
+              )}
+              
               {stories.map((story) => (
                 <StoryCard
                   key={story.id}
@@ -723,11 +734,38 @@ function StoriesContent() {
     setActiveStory(story || null)
   }, [stories])
 
+  const handleDragOver = useCallback((event: DragOverEvent) => {
+    const { over } = event
+    if (!over) {
+      setIsDraggedOver(null)
+      return
+    }
+
+    const overId = over.id as string
+    
+    // Check if we're over a column directly
+    const targetColumn = KANBAN_COLUMNS.find(col => col.id === overId)
+    if (targetColumn) {
+      setIsDraggedOver(overId)
+      return
+    }
+
+    // Check if we're over a story - find which column it belongs to
+    const overStory = stories.find(s => s.id === overId)
+    if (overStory) {
+      setIsDraggedOver(overStory.status)
+      return
+    }
+
+    setIsDraggedOver(null)
+  }, [stories])
+
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event
     
     // Immediate cleanup
     setActiveStory(null)
+    setIsDraggedOver(null)
 
     if (!over || !user) return
 
@@ -1078,6 +1116,7 @@ function StoriesContent() {
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
             autoScroll={false}
           >
@@ -1093,6 +1132,7 @@ function StoriesContent() {
                   onViewDetails={handleViewStoryDetails}
                   isDeleting={isDeleting}
                   deletingStoryId={deletingStoryId}
+                  isDraggedOver={isDraggedOver === column.id}
                   onUnlock={handleUnlockCompletedStory}
                   onLock={handleLockCompletedStory}
                   unlockedStories={unlockedCompletedStories}
@@ -1103,7 +1143,7 @@ function StoriesContent() {
             {/* Optimized Drag Overlay - prevents re-renders */}
             <DragOverlay dropAnimation={null}>
               {activeStory ? (
-                <div className="bg-white dark:bg-gray-800 border rounded-lg p-3 shadow-lg opacity-90 rotate-2 pointer-events-none">
+                <div className="bg-card border border-border rounded-lg p-3 shadow-lg opacity-90 rotate-2 pointer-events-none">
                   <StoryCardContent 
                     story={activeStory} 
                     onEdit={() => {}} 
@@ -1155,14 +1195,14 @@ function StoriesContent() {
           />
           
           {/* Modal */}
-          <div className="relative bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-md p-6 border">
+          <div className="relative bg-card border border-border rounded-lg shadow-2xl w-full max-w-md p-6">
             <div className="space-y-4">
               {/* Header */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <h3 className="text-lg font-semibold text-foreground">
                   Delete Story
                 </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   Are you sure you want to delete &quot;{storyToDelete?.title}&quot;? This action cannot be undone.
                 </p>
               </div>

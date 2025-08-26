@@ -110,31 +110,31 @@ export function StoryDetailModal({ story, isOpen, onClose, onEdit, onStoryUpdate
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'backlog': return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-      case 'planning': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300'
-      case 'sprint_ready': return 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300'
-      case 'completed': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300'
-      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+      case 'backlog': return 'bg-muted text-muted-foreground'
+      case 'planning': return 'bg-muted text-muted-foreground'
+      case 'sprint_ready': return 'bg-muted text-muted-foreground'
+      case 'completed': return 'bg-muted text-muted-foreground'
+      default: return 'bg-muted text-muted-foreground'
     }
   }
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'Must Have': return 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300'
-      case 'Should Have': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300'
-      case 'Could Have': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300'
-      case 'Won\'t Have': return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+      case 'Must Have': return 'bg-muted text-muted-foreground'
+      case 'Should Have': return 'bg-muted text-muted-foreground'
+      case 'Could Have': return 'bg-muted text-muted-foreground'
+      case 'Won\'t Have': return 'bg-muted text-muted-foreground'
+      default: return 'bg-muted text-muted-foreground'
     }
   }
 
   const getRiskColor = (risk: string) => {
     switch (risk) {
-      case 'Critical': return 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300'
-      case 'High': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300'
-      case 'Medium': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-300'
-      case 'Low': return 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300'
-      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+      case 'Critical': return 'bg-muted text-muted-foreground'
+      case 'High': return 'bg-muted text-muted-foreground'
+      case 'Medium': return 'bg-muted text-muted-foreground'
+      case 'Low': return 'bg-muted text-muted-foreground'
+      default: return 'bg-muted text-muted-foreground'
     }
   }
 
@@ -178,7 +178,7 @@ export function StoryDetailModal({ story, isOpen, onClose, onEdit, onStoryUpdate
               )}
               <button
                 onClick={onClose}
-                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+                className="p-1 hover:bg-accent rounded-md transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
