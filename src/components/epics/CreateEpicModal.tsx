@@ -205,15 +205,15 @@ export function CreateEpicModal({
       />
       
       {/* Modal */}
-      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border">
+      <div className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+        <div className="px-6 py-4 border-b bg-muted">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-xl font-semibold text-foreground">
                 {isEditing ? "Edit Epic" : "Create Epic"}
               </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 {isEditing 
                   ? `Editing: ${editingEpic?.name}`
                   : "Organize your stories into manageable epics"
@@ -231,7 +231,7 @@ export function CreateEpicModal({
           <div className="h-[60vh] overflow-y-auto p-6">
             <div className="max-w-xl mx-auto space-y-6">
               {/* Basic Information */}
-              <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+              <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                 <h3 className="text-lg font-medium">Basic Information</h3>
                 <div className="space-y-4">
                   <div>
@@ -263,7 +263,7 @@ export function CreateEpicModal({
               </div>
 
               {/* Acceptance Criteria */}
-              <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+              <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-medium">Acceptance Criteria</h3>
                   <Button 
@@ -310,7 +310,7 @@ export function CreateEpicModal({
               </div>
 
               {/* Visual & Status */}
-              <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+              <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                 <h3 className="text-lg font-medium">Visual & Status</h3>
                 
                 {/* Color Selection */}
@@ -377,7 +377,7 @@ export function CreateEpicModal({
               </div>
 
               {/* Planning */}
-              <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+              <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                 <h3 className="text-lg font-medium">Planning</h3>
                 <div>
                   <label htmlFor="targetDate" className="block text-sm font-medium mb-1">
@@ -393,7 +393,7 @@ export function CreateEpicModal({
               </div>
 
               {/* Preview */}
-              <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+              <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                 <h3 className="text-lg font-medium mb-3">Preview</h3>
                 <div className="flex items-center gap-3">
                   <div 
@@ -417,9 +417,9 @@ export function CreateEpicModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t bg-gray-50 dark:bg-gray-800">
+        <div className="px-6 py-4 border-t bg-muted">
           <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-muted-foreground">
               Fields marked with * are required
             </div>
             <div className="flex gap-3">

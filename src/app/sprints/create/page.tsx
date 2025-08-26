@@ -247,7 +247,7 @@ function CreateSprintForm() {
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+    <div className="min-h-screen bg-background">
       <DashboardHeader />
       
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -255,16 +255,16 @@ function CreateSprintForm() {
         <div className="mb-8">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 mb-4"
+            className="flex items-center gap-2 text-muted-foreground hover:text-slate-900 dark:hover:text-slate-100 mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </button>
           
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100">
+          <h1 className="text-3xl font-bold text-foreground">
             Create New Sprint
           </h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-2">
+          <p className="text-muted-foreground mt-2">
             Set up a collaborative sprint board for your team to estimate and track stories
           </p>
         </div>
@@ -282,8 +282,8 @@ function CreateSprintForm() {
                 <div className={`
                   flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors
                   ${currentStep >= step 
-                    ? 'bg-slate-900 dark:bg-slate-100 border-slate-900 dark:border-slate-100 text-white dark:text-slate-900' 
-                    : 'border-slate-300 dark:border-slate-600 text-slate-400 dark:text-slate-500'
+                    ? 'bg-primary border-primary text-primary-foreground' 
+                    : 'border-muted-foreground/50 text-muted-foreground'
                   }
                 `}>
                   <Icon className="w-5 h-5" />
@@ -291,7 +291,7 @@ function CreateSprintForm() {
                 <div className="ml-3 min-w-0">
                   <p className={`text-sm font-medium ${
                     currentStep >= step 
-                      ? 'text-slate-900 dark:text-slate-100' 
+                      ? 'text-foreground' 
                       : 'text-slate-500 dark:text-slate-400'
                   }`}>
                     {title}
@@ -300,8 +300,8 @@ function CreateSprintForm() {
                 {step < 4 && (
                   <div className={`w-16 h-0.5 mx-4 ${
                     currentStep > step 
-                      ? 'bg-slate-900 dark:bg-slate-100' 
-                      : 'bg-slate-300 dark:bg-slate-600'
+                      ? 'bg-primary' 
+                      : 'bg-muted-foreground/30'
                   }`} />
                 )}
               </div>
@@ -310,14 +310,14 @@ function CreateSprintForm() {
         </div>
 
         {/* Form Content */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 relative">
+        <div className="bg-card rounded-xl shadow-sm border border-border relative">
           {/* Loading Overlay */}
           {isLoading && (
-            <div className="absolute inset-0 bg-white/90 dark:bg-slate-800/90 rounded-xl flex items-center justify-center" style={{ zIndex: 9999 }}>
+            <div className="absolute inset-0 bg-background/90 rounded-xl flex items-center justify-center" style={{ zIndex: 9999 }}>
               <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 dark:border-slate-100 mx-auto mb-4"></div>
-                <div className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">Creating Sprint...</div>
-                <div className="text-sm text-slate-600 dark:text-slate-400">This may take a few moments</div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                <div className="text-lg font-medium text-foreground mb-2">Creating Sprint...</div>
+                <div className="text-sm text-muted-foreground">This may take a few moments</div>
               </div>
             </div>
           )}
@@ -327,7 +327,7 @@ function CreateSprintForm() {
             {currentStep === 1 && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                  <h2 className="text-xl font-semibold text-foreground mb-4">
                     Sprint Details
                   </h2>
                   
@@ -342,7 +342,7 @@ function CreateSprintForm() {
                         value={formData.name}
                         onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                         placeholder="e.g., Sprint 1: User Authentication"
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                       />
                       {errors.name && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>}
                     </div>
@@ -357,7 +357,7 @@ function CreateSprintForm() {
                         value={formData.description}
                         onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                         placeholder="Brief description of what this sprint will accomplish..."
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                       />
                     </div>
 
@@ -371,7 +371,7 @@ function CreateSprintForm() {
                         value={formData.goal}
                         onChange={(e) => setFormData(prev => ({ ...prev, goal: e.target.value }))}
                         placeholder="What is the main objective of this sprint?"
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                       />
                       {errors.goal && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.goal}</p>}
                     </div>
@@ -385,7 +385,7 @@ function CreateSprintForm() {
                         <select
                           value={selectedEpic}
                           onChange={(e) => handleEpicChange(e.target.value)}
-                          className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                         >
                           <option value="">Select an epic (optional)</option>
                           {availableEpics.map(epic => (
@@ -405,7 +405,7 @@ function CreateSprintForm() {
             {currentStep === 2 && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                  <h2 className="text-xl font-semibold text-foreground mb-4">
                     Sprint Timeline
                   </h2>
                   
@@ -419,7 +419,7 @@ function CreateSprintForm() {
                         type="date"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                       />
                       {errors.startDate && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.startDate}</p>}
                     </div>
@@ -433,7 +433,7 @@ function CreateSprintForm() {
                         type="date"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                       />
                       {errors.endDate && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.endDate}</p>}
                     </div>
@@ -441,10 +441,10 @@ function CreateSprintForm() {
 
                   {/* Sprint Duration Display */}
                   {sprintDuration > 0 && (
-                    <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                    <div className="mt-4 p-4 bg-muted/30 border border-border rounded-lg">
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-                        <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                        <Calendar className="w-5 h-5 text-muted-foreground" />
+                        <span className="text-sm font-medium text-foreground">
                           Sprint Duration: {sprintDuration} days
                         </span>
                       </div>
@@ -464,7 +464,7 @@ function CreateSprintForm() {
             {currentStep === 3 && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                  <h2 className="text-xl font-semibold text-foreground mb-4">
                     Sprint Access Control
                   </h2>
                   
@@ -484,7 +484,7 @@ function CreateSprintForm() {
                                 setPassword(e.target.value)
                                 console.log('Password changed:', e.target.value)
                               }}
-                              className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                              className="w-full px-3 py-2 pr-10 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                             />
                             <button
                               type="button"
@@ -507,7 +507,7 @@ function CreateSprintForm() {
                               placeholder="Confirm password"
                               value={confirmPassword}
                               onChange={(e) => setConfirmPassword(e.target.value)}
-                              className="w-full px-3 py-2 pr-10 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-slate-500 focus:border-transparent"
+                              className="w-full px-3 py-2 pr-10 border border-input rounded-lg bg-background text-foreground focus:ring-2 focus:ring-ring focus:border-transparent"
                             />
                             <button
                               type="button"
@@ -522,24 +522,24 @@ function CreateSprintForm() {
                       </div>
 
                     {/* Security Info */}
-                    <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                    <div className="mt-4 p-4 bg-muted/30 border border-border rounded-lg">
                       <div className="flex items-start gap-3">
-                        <Shield className="w-5 h-5 text-slate-600 dark:text-slate-400 mt-0.5" />
+                        <Shield className="w-5 h-5 text-muted-foreground mt-0.5" />
                         <div>
-                          <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                          <h3 className="text-sm font-medium text-foreground">
                             Access Levels
                           </h3>
                           <ul className="text-sm text-slate-700 dark:text-slate-300 mt-2 space-y-2">
                             <li>
-                              <strong className="text-slate-900 dark:text-slate-100">Team Members:</strong> 
+                              <strong className="text-foreground">Team Members:</strong> 
                               <span className="ml-1">Can participate, move stories, and collaborate based on their role</span>
                             </li>
                             <li>
-                              <strong className="text-slate-900 dark:text-slate-100">Sprint Host:</strong> 
+                              <strong className="text-foreground">Sprint Host:</strong> 
                               <span className="ml-1">Full sprint control including completion and settings</span>
                             </li>
                             <li>
-                              <strong className="text-slate-900 dark:text-slate-100">Password Required:</strong> 
+                              <strong className="text-foreground">Password Required:</strong> 
                               <span className="ml-1">All participants must enter the sprint password to join</span>
                             </li>
                           </ul>
@@ -555,29 +555,29 @@ function CreateSprintForm() {
             {currentStep === 4 && (
               <div className="space-y-6">
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100 mb-4">
+                  <h2 className="text-xl font-semibold text-foreground mb-4">
                     Select Stories
                   </h2>
                   
                   {/* Sprint Summary */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
-                      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                    <div className="bg-muted/30 border border-border p-4 rounded-lg">
+                      <div className="text-2xl font-bold text-foreground">
                         {selectedStories.length}
                       </div>
-                      <div className="text-sm text-slate-600 dark:text-slate-400">Stories Selected</div>
+                      <div className="text-sm text-muted-foreground">Stories Selected</div>
                     </div>
-                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
-                      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                    <div className="bg-muted/30 border border-border p-4 rounded-lg">
+                      <div className="text-2xl font-bold text-foreground">
                         {totalPoints}
                       </div>
-                      <div className="text-sm text-slate-600 dark:text-slate-400">Story Points</div>
+                      <div className="text-sm text-muted-foreground">Story Points</div>
                     </div>
-                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
-                      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                    <div className="bg-muted/30 border border-border p-4 rounded-lg">
+                      <div className="text-2xl font-bold text-foreground">
                         {sprintDuration}
                       </div>
-                      <div className="text-sm text-slate-600 dark:text-slate-400">Days</div>
+                      <div className="text-sm text-muted-foreground">Days</div>
                     </div>
                   </div>
 
@@ -585,11 +585,11 @@ function CreateSprintForm() {
                   {isLoading ? (
                     <div className="text-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900 dark:border-slate-100 mx-auto"></div>
-                      <p className="text-slate-600 dark:text-slate-400 mt-2">Loading stories...</p>
+                      <p className="text-muted-foreground mt-2">Loading stories...</p>
                     </div>
                   ) : availableStories.length === 0 ? (
                     <div className="text-center py-8">
-                      <p className="text-slate-600 dark:text-slate-400">
+                      <p className="text-muted-foreground">
                         No sprint-ready stories found. Make sure you have stories in &quot;Sprint Ready&quot; status.
                       </p>
                     </div>
@@ -601,8 +601,8 @@ function CreateSprintForm() {
                           className={`
                             p-4 border-2 rounded-lg cursor-pointer transition-all
                             ${selectedStories.includes(story.id)
-                              ? 'border-slate-900 dark:border-slate-100 bg-slate-50 dark:bg-slate-800'
-                              : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500'
+                              ? 'border-primary bg-muted'
+                              : 'border-border hover:border-ring'
                             }
                           `}
                           onClick={() => handleStoryToggle(story.id)}
@@ -617,26 +617,23 @@ function CreateSprintForm() {
                                 onClick={(e) => e.stopPropagation()}
                               />
                               <div className="flex-1">
-                                <h3 className="font-medium text-slate-900 dark:text-slate-100">
+                                <h3 className="font-medium text-foreground">
                                   {story.title}
                                 </h3>
                                 {story.description && (
-                                  <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">
+                                  <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
                                     {story.description}
                                   </p>
                                 )}
                                 <div className="flex items-center gap-2 mt-2">
                                   <span className={`
                                     px-2 py-0.5 text-xs rounded-full font-medium
-                                    ${story.priority === 'Must Have' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
-                                      story.priority === 'Should Have' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
-                                      'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                                    }
+                                    bg-muted text-muted-foreground
                                   `}>
                                     {story.priority}
                                   </span>
                                   {story.storyPoints && (
-                                    <span className="px-2 py-0.5 text-xs rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400">
+                                    <span className="px-2 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">
                                       {story.storyPoints} pts
                                     </span>
                                   )}
@@ -665,7 +662,7 @@ function CreateSprintForm() {
                 type="button"
                 onClick={handlePrev}
                 disabled={currentStep === 1 || isLoading}
-                className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 border border-border text-muted-foreground rounded-lg hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Previous
               </button>
@@ -675,7 +672,7 @@ function CreateSprintForm() {
                   type="button"
                   onClick={handleNext}
                   disabled={isLoading}
-                  className="px-6 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 disabled:bg-slate-400 disabled:cursor-not-allowed text-white dark:text-slate-900 rounded-lg transition-colors"
+                  className="px-6 py-2 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground rounded-lg transition-colors"
                 >
                   Next
                 </button>
@@ -684,11 +681,11 @@ function CreateSprintForm() {
                   type="button"
                   onClick={handleSubmit}
                   disabled={isLoading || selectedStories.length === 0}
-                  className="px-6 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 disabled:bg-slate-400 disabled:cursor-not-allowed text-white dark:text-slate-900 rounded-lg transition-colors flex items-center gap-2"
+                  className="px-6 py-2 bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed text-primary-foreground rounded-lg transition-colors flex items-center gap-2"
                 >
                   {isLoading ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white dark:border-slate-900"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground"></div>
                       Creating Sprint...
                     </>
                   ) : (

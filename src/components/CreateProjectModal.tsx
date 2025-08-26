@@ -64,21 +64,21 @@ export function CreateProjectModal({ open, onOpenChange, onCreateProject }: Crea
       />
       
       {/* Modal */}
-      <div className="relative bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden border">
+      <div className="relative bg-card border border-border rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700">
+        <div className="px-6 py-4 border-b bg-muted">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-xl font-semibold text-foreground">
                 Create New Project
               </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Set up a new agile project with planning poker configuration
               </p>
             </div>
             <button
               onClick={() => onOpenChange(false)}
-              className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+              className="p-2 hover:bg-accent rounded-md transition-colors"
             >
               <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -92,7 +92,7 @@ export function CreateProjectModal({ open, onOpenChange, onCreateProject }: Crea
           <div className="h-[60vh] overflow-y-auto p-6">
             <div className="max-w-3xl mx-auto space-y-8">
               {/* Basic Information */}
-              <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+              <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                 <h3 className="text-lg font-medium">Basic Information</h3>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
@@ -131,7 +131,7 @@ export function CreateProjectModal({ open, onOpenChange, onCreateProject }: Crea
               </div>
 
               {/* Project Configuration */}
-              <div className="space-y-4 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+              <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                 <h3 className="text-lg font-medium">Project Configuration</h3>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   <div>
@@ -188,9 +188,9 @@ export function CreateProjectModal({ open, onOpenChange, onCreateProject }: Crea
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t bg-gray-50 dark:bg-gray-800">
+        <div className="px-6 py-4 border-t bg-muted">
           <div className="flex justify-between items-center">
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-muted-foreground">
               Fields marked with * are required
             </div>
             <div className="flex gap-3">

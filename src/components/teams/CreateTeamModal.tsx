@@ -132,7 +132,7 @@ export function CreateTeamModal({ isOpen, onClose, selectedProject }: CreateTeam
               
               <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Project Assignment */}
-                <div className="space-y-4 p-6 bg-muted/30 rounded-lg">
+                <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                   <h3 className="text-lg font-medium">Project Assignment</h3>
                   
                   <div className="space-y-2">
@@ -152,7 +152,7 @@ export function CreateTeamModal({ isOpen, onClose, selectedProject }: CreateTeam
                 </div>
 
                 {/* Team Details */}
-                <div className="space-y-4 p-6 bg-muted/30 rounded-lg">
+                <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                   <h3 className="text-lg font-medium">Team Details</h3>
                   
                   <div className="space-y-4">
@@ -188,7 +188,7 @@ export function CreateTeamModal({ isOpen, onClose, selectedProject }: CreateTeam
                 </div>
 
                 {/* Team Settings */}
-                <div className="space-y-4 p-6 bg-muted/30 rounded-lg">
+                <div className="space-y-4 p-6 bg-muted/30 border border-border rounded-lg">
                   <h3 className="text-lg font-medium">Team Settings</h3>
                   
                   <div className="space-y-4">
