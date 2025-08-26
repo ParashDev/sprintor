@@ -20,8 +20,8 @@ import { hashPassword, verifyPassword } from './sprint-service'
 // === UTILITY FUNCTIONS ===
 
 // Helper function to clean data for Firestore (remove undefined fields)
-function cleanDataForFirestore(data: Record<string, any>): Record<string, any> {
-  const cleaned: Record<string, any> = {}
+function cleanDataForFirestore(data: Record<string, unknown>): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = {}
   Object.entries(data).forEach(([key, value]) => {
     if (value !== undefined) {
       cleaned[key] = value
@@ -96,7 +96,7 @@ export async function validateSprintAccess(
       teamsSnapshot.forEach((teamDoc) => {
         const teamData = teamDoc.data()
         if (teamData.members && Array.isArray(teamData.members)) {
-          const member = teamData.members.find((member: any) => 
+          const member = teamData.members.find((member: { email?: string; status: string }) => 
             member.email && member.email.toLowerCase() === email.toLowerCase() && 
             member.status === 'active'
           )

@@ -185,7 +185,7 @@ export function SprintCompletionDialog({
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  <strong>Please explain why each incomplete story couldn't be finished.</strong> This information will help the team during re-grooming and improve future sprint planning.
+                  <strong>Please explain why each incomplete story couldn&apos;t be finished.</strong> This information will help the team during re-grooming and improve future sprint planning.
                 </p>
                 <div className="space-y-3 max-h-64 overflow-y-auto">
                   {incompleteStories.map(story => (
@@ -210,7 +210,7 @@ export function SprintCompletionDialog({
                       </div>
                       <div>
                         <Label className="text-xs text-muted-foreground mb-1 block">
-                          Why wasn't this story completed? <span className="text-red-500">*</span>
+                          Why wasn&apos;t this story completed? <span className="text-red-500">*</span>
                         </Label>
                         <Textarea
                           placeholder="e.g., Blocked by dependencies, technical complexity underestimated, requirements changed, external API issues..."
