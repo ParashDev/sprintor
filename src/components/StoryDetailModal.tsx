@@ -22,6 +22,7 @@ import {
   Trash2
 } from "lucide-react"
 import type { Story } from "@/types/story"
+import type { SprintMember } from "@/types/sprint"
 import { addStoryComment, deleteStoryComment } from "@/lib/story-service"
 import { useAuth } from "@/contexts/AuthContext"
 
@@ -31,14 +32,30 @@ interface StoryDetailModalProps {
   onClose: () => void
   onEdit?: () => void
   onStoryUpdated?: () => void
+  // Sprint context props
+  isSprintContext?: boolean
+  sprintMembers?: SprintMember[]
+  currentAssignee?: string
+  onAssignmentChange?: (assignedTo: string | undefined) => void
 }
 
-export function StoryDetailModal({ story, isOpen, onClose, onEdit, onStoryUpdated }: StoryDetailModalProps) {
+export function StoryDetailModal({ 
+  story, 
+  isOpen, 
+  onClose, 
+  onEdit, 
+  onStoryUpdated,
+  isSprintContext = false,
+  sprintMembers = [],
+  currentAssignee,
+  onAssignmentChange
+}: StoryDetailModalProps) {
   const { user } = useAuth()
   const [newComment, setNewComment] = useState("")
   const [isAddingComment, setIsAddingComment] = useState(false)
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null)
   const [commentToDelete, setCommentToDelete] = useState<string | null>(null)
+  const [isUpdatingAssignment, setIsUpdatingAssignment] = useState(false)
 
   // Lock body scroll when modal is open
   React.useEffect(() => {
@@ -106,6 +123,19 @@ export function StoryDetailModal({ story, isOpen, onClose, onEdit, onStoryUpdate
 
   const cancelDeleteComment = () => {
     setCommentToDelete(null)
+  }
+
+  const handleAssignmentChange = async (newAssignee: string | undefined) => {
+    if (!isSprintContext || !onAssignmentChange) return
+
+    setIsUpdatingAssignment(true)
+    try {
+      await onAssignmentChange(newAssignee)
+    } catch (error) {
+      console.error("Failed to update assignment:", error)
+    } finally {
+      setIsUpdatingAssignment(false)
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -308,15 +338,38 @@ export function StoryDetailModal({ story, isOpen, onClose, onEdit, onStoryUpdate
                         </p>
                       </div>
                     </div>
-                    {story.assignedTo && (
-                      <div className="flex items-center gap-2">
-                        <User className="w-3 h-3 text-muted-foreground" />
-                        <div className="flex-1">
-                          <p className="text-xs text-muted-foreground">Assigned To</p>
-                          <p className="text-sm">{story.assignedTo}</p>
-                        </div>
+                    
+                    {/* Assignment Section */}
+                    <div className="flex items-center gap-2">
+                      <User className="w-3 h-3 text-muted-foreground" />
+                      <div className="flex-1">
+                        <p className="text-xs text-muted-foreground">Assigned To</p>
+                        {isSprintContext && onAssignmentChange ? (
+                          <div>
+                            <select
+                              value={currentAssignee || ""}
+                              onChange={(e) => handleAssignmentChange(e.target.value || undefined)}
+                              disabled={isUpdatingAssignment}
+                              className="text-sm bg-background border border-input rounded px-2 py-1 min-w-0 w-full"
+                            >
+                              <option value="">Unassigned</option>
+                              {sprintMembers.map((member) => (
+                                <option key={member.id} value={member.name}>
+                                  {member.name} ({(member.teamRole || member.role || 'member').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())})
+                                </option>
+                              ))}
+                            </select>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {sprintMembers.length} team members available
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm">
+                            {story.assignedTo || currentAssignee || "Unassigned"}
+                          </p>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </div>
                 </div>
 

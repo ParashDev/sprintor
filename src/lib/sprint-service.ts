@@ -39,6 +39,8 @@ import type { Story, SprintAttempt } from '@/types/story'
 import { getStoriesByProject, getStory, updateStory } from './story-service'
 import { updateEpicStoryCounts } from './epic-service'
 import { incrementProjectSprintCount } from './project-service'
+import { getTeamsByUser } from './team-service'
+import type { TeamMemberRole } from '@/types/sprint'
 // === UTILITY FUNCTIONS ===
 
 // Generate unique IDs
@@ -182,6 +184,42 @@ export async function createSprint(sprintData: CreateSprintRequest): Promise<str
     const totalStoryPoints = sprintStories.reduce((sum, story) => 
       sum + (story.storyPoints || 0), 0
     )
+
+    // Fetch project team members to populate sprint members
+    const projectTeams = await getTeamsByUser(sprintData.hostId)
+    const projectTeam = projectTeams.find(team => team.projectId === sprintData.projectId)
+    
+    // Convert team members to sprint members
+    const sprintMembers: SprintMember[] = projectTeam?.members.map(member => ({
+      id: member.id,
+      name: member.name,
+      email: member.email,
+      teamRole: member.role as TeamMemberRole,
+      role: member.id === sprintData.hostId ? 'host' : 'member',
+      avatar: member.avatar,
+      capacity: undefined,
+      joinedAt: new Date(),
+      lastSeen: new Date(),
+      isOnline: true,
+      isHost: member.id === sprintData.hostId
+    })) || []
+
+    // Ensure host is always included as a member if not in team
+    if (!sprintMembers.find(m => m.id === sprintData.hostId)) {
+      sprintMembers.push({
+        id: sprintData.hostId,
+        name: sprintData.hostName,
+        email: undefined,
+        teamRole: 'product_owner' as TeamMemberRole,
+        role: 'host',
+        avatar: undefined,
+        capacity: undefined,
+        joinedAt: new Date(),
+        lastSeen: new Date(),
+        isOnline: true,
+        isHost: true
+      })
+    }
     
     // Create sprint document
     const sprint: Omit<Sprint, 'createdAt' | 'updatedAt' | 'lastActivity'> = {
@@ -206,7 +244,7 @@ export async function createSprint(sprintData: CreateSprintRequest): Promise<str
       columns: DEFAULT_SPRINT_COLUMNS,
       hostId: sprintData.hostId,
       hostName: sprintData.hostName,
-      members: [],
+      members: sprintMembers,
       participants: [],
       burndownData: [],
       allowGuestAccess: sprintData.allowGuestAccess,

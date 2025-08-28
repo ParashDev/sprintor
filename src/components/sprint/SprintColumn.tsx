@@ -23,6 +23,7 @@ interface SprintColumnProps {
   accessLevel?: 'view' | 'contribute' | 'admin'
   isDraggedOver: boolean
   onAddStory?: () => void
+  onStoryClick?: (story: SprintStory) => void
 }
 
 export function SprintColumn({
@@ -33,7 +34,8 @@ export function SprintColumn({
   permissions,
   accessLevel, // DEPRECATED: Keep for backward compatibility
   isDraggedOver,
-  onAddStory
+  onAddStory,
+  onStoryClick
 }: SprintColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id
@@ -117,6 +119,7 @@ export function SprintColumn({
                 permissions={permissions}
                 accessLevel={accessLevel || 'view'} // DEPRECATED: Provide fallback for backward compatibility
                 isDragging={false}
+                onClick={onStoryClick ? () => onStoryClick(story) : undefined}
               />
             ))}
           </SortableContext>

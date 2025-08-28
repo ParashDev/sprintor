@@ -22,6 +22,8 @@ import {
 import { restrictToWindowEdges } from '@dnd-kit/modifiers'
 import type { Sprint, SprintStory, SprintParticipant, TeamMemberRole } from '@/types/sprint'
 import { updateSprint, subscribeToSprint, completeSprint } from '@/lib/sprint-service'
+import { getStory, updateStory } from '@/lib/story-service'
+import { getTeamsByUser } from '@/lib/team-service'
 import { getSprintPermissions } from '@/lib/sprint-permissions'
 import { SprintCompletionDialog } from './SprintCompletionDialog'
 import { SprintColumn } from './SprintColumn'
@@ -29,6 +31,8 @@ import { SprintCard } from './SprintCard'
 import { SprintHeader } from './SprintHeader'
 import { ParticipantCursors } from './ParticipantCursors'
 import { AddStoryModal } from './AddStoryModal'
+import { StoryDetailModal } from '@/components/StoryDetailModal'
+import type { Story } from '@/types/story'
 
 interface SprintBoardProps {
   sprint: Sprint
@@ -66,9 +70,30 @@ export function SprintBoard({
   const [isDragging, setIsDragging] = useState(false)
   const [isLocalUpdate, setIsLocalUpdate] = useState(false)
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
+  const [selectedStory, setSelectedStory] = useState<SprintStory | null>(null)
+  const [selectedOriginalStory, setSelectedOriginalStory] = useState<Story | null>(null)
+  const [showStoryDetailModal, setShowStoryDetailModal] = useState(false)
+  const [loadingStoryDetails, setLoadingStoryDetails] = useState(false)
+  const [projectTeamMembers, setProjectTeamMembers] = useState<any[]>([])
 
   // Use local sprint state for immediate UI updates
   const currentSprint = localSprint
+
+  // Fetch project team members for assignment
+  useEffect(() => {
+    const fetchProjectTeam = async () => {
+      try {
+        const teams = await getTeamsByUser(currentSprint.hostId)
+        const projectTeam = teams.find(team => team.projectId === currentSprint.projectId)
+        setProjectTeamMembers(projectTeam?.members || [])
+      } catch (error) {
+        console.error('Failed to fetch project team:', error)
+        setProjectTeamMembers([])
+      }
+    }
+
+    fetchProjectTeam()
+  }, [currentSprint.hostId, currentSprint.projectId])
 
   // Set up real-time subscription for updates from other users
   useEffect(() => {
@@ -270,6 +295,275 @@ export function SprintBoard({
     }
   }
 
+  // Handle story detail view
+  const handleStoryClick = async (sprintStory: SprintStory) => {
+    setSelectedStory(sprintStory)
+    setLoadingStoryDetails(true)
+    
+    try {
+      // Fetch the ORIGINAL story data to get comments, real dates, etc.
+      const originalStory = await getStory(sprintStory.originalStoryId)
+      setSelectedOriginalStory(originalStory)
+      setShowStoryDetailModal(true)
+    } catch (error) {
+      console.error('Failed to fetch original story:', error)
+      // Fallback to converted data if original story fetch fails
+      setSelectedOriginalStory(convertSprintStoryToStory(sprintStory))
+      setShowStoryDetailModal(true)
+    } finally {
+      setLoadingStoryDetails(false)
+    }
+  }
+
+  // Handle story assignment in sprint context
+  const handleStoryAssignmentChange = async (storyId: string, assignedToName: string | undefined) => {
+    try {
+      const sprintStory = currentSprint.stories.find(s => s.id === storyId)
+      if (!sprintStory) return
+
+      // assignedToName is already the name from the dropdown
+
+      // Update sprint story
+      const updatedStories = currentSprint.stories.map(story => 
+        story.id === storyId 
+          ? { 
+              ...story, 
+              assignedTo: assignedToName, 
+              assignedToName: assignedToName
+            }
+          : story
+      )
+      
+      const updatedSprint = {
+        ...currentSprint,
+        stories: updatedStories,
+        updatedAt: new Date()
+      }
+
+      // Update local state immediately for responsive UI
+      setLocalSprint(updatedSprint)
+
+      // Update ORIGINAL story so both modals show same assignment
+      if (sprintStory.originalStoryId) {
+        await updateStory(sprintStory.originalStoryId, {
+          assignedTo: assignedToName || undefined  // Save the NAME
+        })
+      }
+
+      // Update sprint story assignment
+      await updateSprint(currentSprint.id, {
+        storyUpdates: [{
+          id: storyId,
+          assignedTo: assignedToName
+        }]
+      })
+
+      // Update selected story to reflect new assignment
+      if (selectedStory && selectedStory.id === storyId) {
+        setSelectedStory({
+          ...selectedStory,
+          assignedTo: assignedToName,
+          assignedToName: assignedToName
+        })
+      }
+
+      // Refresh the original story modal if open to show updated assignment
+      if (selectedOriginalStory && sprintStory.originalStoryId) {
+        const refreshedStory = await getStory(sprintStory.originalStoryId)
+        if (refreshedStory) {
+          setSelectedOriginalStory(refreshedStory)
+        }
+      }
+
+    } catch (error) {
+      console.error('Failed to update story assignment:', error)
+      // Revert local state on error
+      setLocalSprint(currentSprint)
+      throw error
+    }
+  }
+
+  // Convert SprintStory to Story for the detail modal
+  const convertSprintStoryToStory = (sprintStory: SprintStory): Story => {
+    // Safely handle date conversion
+    const safeDate = (date: any): Date => {
+      if (!date) return new Date()
+      if (date instanceof Date) return date
+      if (date.toDate && typeof date.toDate === 'function') return date.toDate()
+      if (typeof date === 'string' || typeof date === 'number') {
+        const parsed = new Date(date)
+        return isNaN(parsed.getTime()) ? new Date() : parsed
+      }
+      return new Date()
+    }
+
+    // Convert sprint comments to story comments format
+    const convertedComments = (sprintStory.sprintComments || []).map(comment => ({
+      id: comment.id,
+      text: comment.text,
+      authorId: comment.authorId,
+      authorName: comment.authorName,
+      createdAt: safeDate(comment.createdAt),
+      type: comment.type || 'comment' as any,
+      mentions: comment.mentions || []
+    }))
+
+    return {
+      // Basic Info
+      id: sprintStory.originalStoryId || sprintStory.id,
+      title: sprintStory.title || '',
+      description: sprintStory.description || '',
+      type: (sprintStory.originalData?.type || 'story') as any,
+      
+      // User Story Format - use empty strings as fallbacks
+      asA: sprintStory.originalData?.asA,
+      iWant: sprintStory.originalData?.iWant,
+      soThat: sprintStory.originalData?.soThat,
+      
+      // Business Details
+      businessValue: sprintStory.originalData?.businessValue || 5,
+      priority: (sprintStory.originalData?.priority || 'Could Have') as any,
+      riskLevel: (sprintStory.originalData?.riskLevel || sprintStory.originalData?.risk || 'Medium') as any,
+      complexity: 'Moderate' as any,
+      
+      // Acceptance Criteria & Requirements
+      acceptanceCriteria: (sprintStory.originalData?.acceptanceCriteria || []).map((criterion, index) => ({
+        id: `ac-${sprintStory.id}-${index}`,
+        description: typeof criterion === 'string' ? criterion : criterion?.description || '',
+        type: 'checklist' as any,
+        isCompleted: false,
+        testable: true,
+        priority: 'must' as any
+      })),
+      definitionOfDone: [],
+      functionalRequirements: [],
+      nonFunctionalRequirements: [],
+      businessRules: [],
+      
+      // Estimation & Planning
+      storyPoints: sprintStory.storyPoints,
+      timeEstimate: sprintStory.timeEstimate,
+      estimationConfidence: 'Medium' as any,
+      
+      // Sprint & Release Management
+      sprintId: currentSprint.id,
+      releaseId: undefined,
+      milestoneId: undefined,
+      
+      // Hierarchy & Relationships
+      epicId: currentSprint.epicId,
+      parentStoryId: undefined,
+      childStoryIds: [],
+      dependencyIds: [],
+      blockedByIds: [],
+      relatedStoryIds: [],
+      
+      // Status & Workflow - Complete story lifecycle
+      status: sprintStory.sprintStatus === 'todo' ? 'sprint_ready' : 
+              sprintStory.sprintStatus === 'in_progress' ? 'planning' :
+              sprintStory.sprintStatus === 'done' ? 'completed' : 'sprint_ready',
+      workflowStatus: sprintStory.sprintStatus || 'todo',
+      blockers: sprintStory.blockers || [],
+      
+      // Assignment & Ownership
+      assignedTo: sprintStory.assignedToName,
+      reportedBy: currentSprint.hostId,
+      productOwner: undefined,
+      stakeholders: [],
+      
+      // Categorization
+      labels: sprintStory.originalData?.labels || [],
+      components: [],
+      fixVersion: undefined,
+      
+      // Testing & Quality
+      testScenarios: [],
+      testingNotes: undefined,
+      bugReproductionSteps: undefined,
+      
+      // Attachments & Documentation
+      attachments: [],
+      mockups: [],
+      wireframes: [],
+      specifications: [],
+      
+      // Comments & Communication
+      comments: convertedComments,
+      lastDiscussion: convertedComments.length > 0 ? safeDate(convertedComments[convertedComments.length - 1].createdAt) : undefined,
+      
+      // Analytics & Tracking
+      createdAt: safeDate(sprintStory.addedToSprintAt),
+      updatedAt: safeDate(sprintStory.lastUpdated),
+      startedAt: safeDate(sprintStory.startedAt),
+      completedAt: safeDate(sprintStory.completedAt),
+      timeInProgress: sprintStory.actualTime,
+      reopenedCount: 0,
+      
+      // Project Association
+      projectId: currentSprint.projectId,
+      
+      // Template Info
+      createdFromTemplate: sprintStory.originalData?.createdFromTemplate,
+      
+      // Sprint History Tracking - Include current sprint attempt
+      sprintAttempts: [{
+        sprintId: currentSprint.id,
+        sprintName: currentSprint.name,
+        sprintGoal: currentSprint.goal,
+        sprintStartDate: currentSprint.startDate,
+        sprintEndDate: currentSprint.endDate,
+        sprintDuration: currentSprint.duration,
+        estimationSessionId: undefined,
+        originalStoryPoints: sprintStory.storyPoints,
+        adjustedStoryPoints: sprintStory.storyPoints,
+        estimationConfidence: 'Medium' as any,
+        estimationParticipants: undefined,
+        statusReached: sprintStory.sprintStatus,
+        progressPercentage: sprintStory.progress || 0,
+        stagesCompleted: (sprintStory.statusHistory || []).map(change => ({
+          stage: change.toStatus as any,
+          enteredAt: safeDate(change.timestamp),
+          exitedAt: undefined,
+          timeSpent: 0
+        })),
+        assignments: sprintStory.assignedTo ? [{
+          assignedTo: sprintStory.assignedTo,
+          assignedToName: sprintStory.assignedToName || sprintStory.assignedTo,
+          assignedAt: safeDate(sprintStory.addedToSprintAt),
+          unassignedAt: undefined,
+          reason: undefined
+        }] : [],
+        completionStatus: sprintStory.sprintStatus === 'done' ? 'completed' : 'incomplete',
+        completionReason: sprintStory.sprintStatus === 'done' ? 'done' : undefined,
+        completedAt: sprintStory.completedAt ? safeDate(sprintStory.completedAt) : undefined,
+        incompleteReason: sprintStory.sprintStatus !== 'done' ? 'sprint_ended' : undefined,
+        blockersEncountered: (sprintStory.blockers || []).map(blocker => ({
+          description: blocker.description,
+          type: blocker.type,
+          severity: blocker.severity,
+          reportedAt: safeDate(blocker.createdAt),
+          resolvedAt: blocker.resolvedAt ? safeDate(blocker.resolvedAt) : undefined,
+          impactHours: undefined,
+          resolution: undefined
+        })),
+        scopeChanges: [],
+        complexityInsights: undefined,
+        velocityImpact: undefined,
+        teamFeedback: undefined,
+        retrospectiveNotes: undefined,
+        lessonsLearned: undefined,
+        cycleTime: undefined,
+        leadTime: undefined,
+        touchTime: sprintStory.actualTime,
+        waitTime: undefined,
+        reworkCount: 0,
+        attemptNumber: 1,
+        attemptedAt: safeDate(sprintStory.addedToSprintAt),
+        lastUpdatedAt: safeDate(sprintStory.lastUpdated)
+      }] || []
+    }
+  }
+
   // Handle starting the sprint
   const handleStartSprint = async () => {
     // NEW: Use role-based permission check
@@ -382,6 +676,7 @@ export function SprintBoard({
                     permissions={permissions}
                     accessLevel={accessLevel || 'view'} // DEPRECATED: Provide fallback for backward compatibility
                     isDraggedOver={dragOverColumn === column.id}
+                    onStoryClick={handleStoryClick}
                   />
                 </SortableContext>
               </div>
@@ -473,6 +768,33 @@ export function SprintBoard({
           onClose={() => setShowCompletionDialog(false)}
           sprint={currentSprint}
           onComplete={handleSprintCompletion}
+        />
+      )}
+
+      {/* Story Detail Modal */}
+      {selectedStory && selectedOriginalStory && (
+        <StoryDetailModal
+          story={selectedOriginalStory}
+          isOpen={showStoryDetailModal}
+          onClose={() => {
+            setShowStoryDetailModal(false)
+            setSelectedOriginalStory(null)
+          }}
+          onStoryUpdated={async () => {
+            // Refresh the original story to show new comments instantly
+            if (selectedStory?.originalStoryId) {
+              const refreshedStory = await getStory(selectedStory.originalStoryId)
+              if (refreshedStory) {
+                setSelectedOriginalStory(refreshedStory)
+              }
+            }
+          }}
+          isSprintContext={true}
+          sprintMembers={projectTeamMembers}
+          currentAssignee={selectedStory.assignedTo}
+          onAssignmentChange={async (assignedToName) => {
+            await handleStoryAssignmentChange(selectedStory.id, assignedToName)
+          }}
         />
       )}
     </div>
