@@ -37,6 +37,8 @@ interface StoryDetailModalProps {
   sprintMembers?: SprintMember[]
   currentAssignee?: string
   onAssignmentChange?: (assignedTo: string | undefined) => void
+  currentParticipantName?: string // For anonymous sprint participants
+  isSprintHost?: boolean // For sprint comment delete permissions
 }
 
 export function StoryDetailModal({ 
@@ -48,6 +50,8 @@ export function StoryDetailModal({
   isSprintContext = false,
   sprintMembers = [],
   currentAssignee,
+  currentParticipantName,
+  isSprintHost = false,
   onAssignmentChange
 }: StoryDetailModalProps) {
   const { user } = useAuth()
@@ -73,15 +77,41 @@ export function StoryDetailModal({
 
   if (!story) return null
 
+  // Check if current user can delete a comment
+  const canDeleteComment = (comment: { id: string; authorId: string; authorName: string }) => {
+    // Authenticated user who owns the comment
+    if (user && comment.authorId === user.uid) {
+      return true
+    }
+    
+    // Sprint host can delete any comment in sprint context
+    if (isSprintContext && user && isSprintHost) {
+      return true
+    }
+    
+    // Anonymous sprint participant can delete their own comment (by name matching)
+    if (isSprintContext && !user && currentParticipantName && comment.authorName === currentParticipantName) {
+      return true
+    }
+    
+    return false
+  }
+
   const handleAddComment = async () => {
-    if (!newComment.trim() || !user) return
+    if (!newComment.trim()) return
+    
+    // Check if user is authenticated or is an anonymous sprint participant
+    const authorId = user?.uid || `anonymous_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const authorName = user?.displayName || user?.email || currentParticipantName || "Anonymous User"
+    
+    if (!user && (!isSprintContext || !currentParticipantName)) return
 
     setIsAddingComment(true)
     try {
       await addStoryComment(story.id, {
         text: newComment.trim(),
-        authorId: user.uid,
-        authorName: user.displayName || user.email || "Unknown User",
+        authorId,
+        authorName,
         type: 'comment',
         mentions: []
       })
@@ -99,7 +129,11 @@ export function StoryDetailModal({
   }
 
   const handleDeleteComment = async () => {
-    if (!user || !story || !commentToDelete) return
+    if (!story || !commentToDelete) return
+    
+    // Allow deletion if user has permission (authenticated or anonymous sprint participant)
+    const comment = story.comments.find(c => c.id === commentToDelete)
+    if (!comment || !canDeleteComment(comment)) return
 
     setDeletingCommentId(commentToDelete)
     try {
@@ -411,7 +445,7 @@ export function StoryDetailModal({
               </h4>
               
               {/* Add Comment */}
-              {user && (
+              {(user || (isSprintContext && currentParticipantName)) && (
                 <div className="bg-background border border-border rounded-lg p-3 mb-4">
                   <Textarea
                     placeholder="Add a comment..."
@@ -461,8 +495,8 @@ export function StoryDetailModal({
                                 </>
                               )}
                           </span>
-                          {/* Show delete button only for own comments */}
-                          {user && comment.authorId === user.uid && (
+                          {/* Show delete button for comment author or sprint host */}
+                          {canDeleteComment(comment) && (
                             <button
                               onClick={() => confirmDeleteComment(comment.id)}
                               disabled={deletingCommentId === comment.id}
@@ -482,7 +516,7 @@ export function StoryDetailModal({
                 <div className="text-center py-8 text-muted-foreground">
                   <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm">No comments yet</p>
-                  {user && <p className="text-xs">Be the first to add a comment!</p>}
+                  {(user || (isSprintContext && currentParticipantName)) && <p className="text-xs">Be the first to add a comment!</p>}
                 </div>
               )}
             </div>

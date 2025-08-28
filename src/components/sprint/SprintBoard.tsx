@@ -777,6 +777,8 @@ export function SprintBoard({
           onAssignmentChange={(teamRole === 'product_owner' || teamRole === 'scrum_master' || teamRole === 'business_analyst' || isSprintHost) ? async (assignedToName) => {
             await handleStoryAssignmentChange(selectedStory.id, assignedToName)
           } : undefined}
+          currentParticipantName={memberName}
+          isSprintHost={isSprintHost}
         />
       )}
     </div>

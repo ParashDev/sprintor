@@ -81,19 +81,31 @@ service cloud.firestore {
     // Stories collection
     match /stories/{storyId} {
       // Allow read for anyone (sprint participants need this and they're not Firebase authenticated)
-      // Allow write only for project owners
       allow read: if true;
+      
+      // Allow full write for project owners
       allow write: if request.auth != null && 
         ((request.resource.data.projectId != null && isProjectOwner(request.resource.data.projectId)) ||
          (resource != null && resource.data.projectId != null && isProjectOwner(resource.data.projectId)));
+      
+      // Allow anonymous users to update only comments and lastDiscussion fields (for sprint participants)
+      allow update: if request.auth == null && 
+        isCommentOnlyUpdate();
     }
     
     // Epics collection
     match /epics/{epicId} {
-      // Allow read/write if user owns the project
-      allow read, write: if request.auth != null && 
+      // Allow read for anyone (needed for sprint participants)
+      allow read: if true;
+      
+      // Allow full read/write if user owns the project
+      allow write: if request.auth != null && 
         ((request.resource.data.projectId != null && isProjectOwner(request.resource.data.projectId)) ||
          (resource != null && resource.data.projectId != null && isProjectOwner(resource.data.projectId)));
+      
+      // Allow anonymous users to update only story count fields (when comments are added to stories)
+      allow update: if request.auth == null && 
+        isEpicStoryCountUpdate();
     }
     
     // Story templates collection
@@ -153,6 +165,24 @@ service cloud.firestore {
       return projectId != null && 
              exists(/databases/$(database)/documents/projects/$(projectId)) &&
              get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid;
+    }
+    
+    // Helper function to check if this is only updating comments and lastDiscussion
+    function isCommentOnlyUpdate() {
+      let allowedFields = ['comments', 'lastDiscussion', 'updatedAt'];
+      let changedFields = request.resource.data.diff(resource.data).changedKeys();
+      
+      // Check if only allowed fields are being changed
+      return changedFields.hasOnly(allowedFields);
+    }
+    
+    // Helper function to check if this is only updating epic story counts
+    function isEpicStoryCountUpdate() {
+      let allowedFields = ['storyCount', 'completedStoryCount', 'updatedAt'];
+      let changedFields = request.resource.data.diff(resource.data).changedKeys();
+      
+      // Check if only allowed fields are being changed
+      return changedFields.hasOnly(allowedFields);
     }
     
     
