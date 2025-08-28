@@ -196,7 +196,6 @@ export async function createSprint(sprintData: CreateSprintRequest): Promise<str
       email: member.email,
       teamRole: member.role as TeamMemberRole,
       role: member.id === sprintData.hostId ? 'host' : 'member',
-      avatar: member.avatar,
       capacity: undefined,
       joinedAt: new Date(),
       lastSeen: new Date(),
