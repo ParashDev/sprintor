@@ -404,12 +404,15 @@ export function SprintBoard({
 
   // Convert SprintStory to Story for the detail modal
   const convertSprintStoryToStory = (sprintStory: SprintStory): Story => {
+    // Type for Firestore timestamp objects
+    type FirestoreTimestamp = { toDate(): Date }
+    
     // Safely handle date conversion
     const safeDate = (date: unknown): Date => {
       if (!date) return new Date()
       if (date instanceof Date) return date
-      if (typeof date === 'object' && date !== null && 'toDate' in date && typeof (date as any).toDate === 'function') {
-        return (date as any).toDate()
+      if (typeof date === 'object' && date !== null && 'toDate' in date && typeof (date as FirestoreTimestamp).toDate === 'function') {
+        return (date as FirestoreTimestamp).toDate()
       }
       if (typeof date === 'string' || typeof date === 'number') {
         const parsed = new Date(date)
