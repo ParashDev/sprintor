@@ -364,9 +364,16 @@ export function StoryDetailModal({
                             </div>
                           </div>
                         ) : (
-                          <p className="text-sm">
-                            {story.assignedTo || currentAssignee || "Unassigned"}
-                          </p>
+                          <div>
+                            <p className="text-sm">
+                              {story.assignedTo || currentAssignee || "Unassigned"}
+                            </p>
+                            {isSprintContext && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                View only - assignment requires PO/SM/BA role
+                              </p>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>

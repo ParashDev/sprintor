@@ -80,8 +80,10 @@ service cloud.firestore {
     
     // Stories collection
     match /stories/{storyId} {
-      // Allow read/write if user owns the project
-      allow read, write: if request.auth != null && 
+      // Allow read for anyone (sprint participants need this and they're not Firebase authenticated)
+      // Allow write only for project owners
+      allow read: if true;
+      allow write: if request.auth != null && 
         ((request.resource.data.projectId != null && isProjectOwner(request.resource.data.projectId)) ||
          (resource != null && resource.data.projectId != null && isProjectOwner(resource.data.projectId)));
     }
@@ -152,6 +154,7 @@ service cloud.firestore {
              exists(/databases/$(database)/documents/projects/$(projectId)) &&
              get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid;
     }
+    
     
     // Deny all other access
     match /{document=**} {
